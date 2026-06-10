@@ -54,7 +54,7 @@ function addP(x, y, vx, vy, m, type){
   // gas takes its tint from a smooth spatial field, so each cloud owns a
   // coherent palette (a crimson nebula HERE, a teal one THERE) instead of
   // per-particle confetti that averages to mush
-  P.hue[i] = type === GAS ? hueField(x, y) + (Math.random()-0.5)*22 : Math.random() * 360;
+  P.hue[i] = type === GAS ? hueField(x, y) + (Math.random()-0.5)*14 : Math.random() * 360;
   // spin doubles as: gas → dust flag (dark nebula wisp), star → Cepheid pulse rate
   P.spin[i] = 0;
   if (type === GAS && Math.random() < 0.22) P.spin[i] = 1;
@@ -77,7 +77,10 @@ function killP(i){          // swap-with-last
 let hp1 = 1.3, hp2 = 4.1, hp3 = 2.2;
 function reseedHues(){ hp1 = Math.random()*6.28; hp2 = Math.random()*6.28; hp3 = Math.random()*6.28; }
 function hueField(x, y){
-  const v = Math.sin(x*0.0042 + hp1) + Math.sin(y*0.0035 + hp2) + Math.sin((x*0.6 + y)*0.0021 + hp3);
+  // wavelengths are LONG (≈4000 units) so a single nebula sits inside one or
+  // two adjacent tints with a gentle gradient — colour regions are the size
+  // of whole clouds, never a rainbow inside one
+  const v = Math.sin(x*0.0017 + hp1) + Math.sin(y*0.0014 + hp2) + Math.sin((x*0.6 + y)*0.0009 + hp3);
   return ((v + 3) / 6) * 360;
 }
 

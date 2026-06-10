@@ -3,6 +3,8 @@
 *A living cosmos that runs entirely in your browser — no build step, no
 dependencies, no network.*
 
+**▶ [Watch it live](https://kridev.github.io/aevum/)**
+
 ![Aevum](preview.png)
 
 Open `index.html` and watch a universe happen. Gas falls together under
@@ -76,7 +78,8 @@ Append **`?nointro`** to the URL to skip the title card.
 - `ui.js` — sliders, seed scenes, HUD census, toasts
 - `tools.js` — PNG export, video capture, save / load / share, fullscreen
 
-A sibling of [Primordium](../surprise/) — same philosophy, bigger canvas:
-don't model galaxies, model matter and let the galaxies happen.
+A sibling of [Primordium](https://github.com/Kridev/primordium) — same
+philosophy, bigger canvas: don't model galaxies, model matter and let the
+galaxies happen.
 
 Built in one sitting, June 2026. Seed a 💫 Collision and turn the sound on.

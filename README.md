@@ -1,9 +1,9 @@
-# Sidereum
+# Aevum
 
 *A living cosmos that runs entirely in your browser — no build step, no
 dependencies, no network.*
 
-![Sidereum](preview.png)
+![Aevum](preview.png)
 
 Open `index.html` and watch a universe happen. Gas falls together under
 gravity until a knot ignites — a star is born, its colour set by its mass.

@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sidereum — a living cosmos</title>
+<title>Aevum — a living cosmos</title>
 <meta name="description" content="A living, evolving cosmos in your browser: gas collapses into stars, stars age and go supernova, black holes feed, pulsars sweep, galaxies collide. No build step, no dependencies.">
 <meta name="theme-color" content="#030409">
-<meta property="og:title" content="Sidereum">
+<meta property="og:title" content="Aevum">
 <meta property="og:description" content="Gravity + time → stars, supernovae, black holes, galaxies. A living cosmos that was never choreographed.">
 <meta property="og:type" content="website">
 <meta property="og:image" content="preview.png">
@@ -71,6 +71,12 @@
     padding:7px 18px;border-radius:20px;border:1px solid var(--panel-br);
     backdrop-filter:blur(10px);white-space:nowrap}
   #hud b{color:var(--accent);font-weight:700}
+  /* telemetry for whatever the camera is riding with */
+  #followCard{position:fixed;bottom:12px;left:14px;z-index:9;display:none;
+    font-size:11px;color:var(--txt);background:var(--panel);
+    padding:7px 16px;border-radius:20px;border:1px solid var(--panel-br);
+    backdrop-filter:blur(10px);white-space:nowrap;letter-spacing:.4px}
+  #followCard b{color:var(--accent)}
   #intro{position:fixed;inset:0;z-index:20;display:flex;flex-direction:column;
     align-items:center;justify-content:center;text-align:center;
     background:radial-gradient(ellipse at center,rgba(6,8,18,.35),rgba(3,4,9,.88));
@@ -118,6 +124,7 @@
     #bClose{top:10px;right:10px}
     #hud{bottom:auto;top:10px;font-size:10px;gap:10px;padding:6px 12px}
     #zoomCtl{bottom:80px}
+    #followCard{bottom:70px}
     #intro .big{font-size:36px;letter-spacing:3px}
     #intro p{font-size:12px;padding:0 24px}
   }
@@ -129,14 +136,14 @@
 <button id="toggleUI" title="Show panel" aria-label="Show control panel">☰</button>
 
 <div id="intro">
-  <div class="big">SIDEREUM</div>
+  <div class="big">AEVUM</div>
   <p>gas · gravity · time — a cosmos that lives, burns and dies on its own</p>
   <div class="go">let there be light →</div>
 </div>
 
 <div id="ui">
   <button id="bClose" title="Hide panel (H)" aria-label="Hide control panel" style="position:absolute;top:14px;right:14px;width:28px;height:28px;flex:none;padding:0;border-radius:8px;font-size:14px">×</button>
-  <h1>Sidereum</h1>
+  <h1>Aevum</h1>
   <div class="sub">a living cosmos — stars are born, age and die</div>
 
   <div class="group">
@@ -225,7 +232,7 @@
 <button id="helpBtn" title="What is this? (?)" aria-label="Help and about">?</button>
 <div id="help">
   <div class="card">
-    <h2>Sidereum</h2>
+    <h2>Aevum</h2>
     <div class="muted">a living cosmos</div>
     <p>Every dot is matter. <b>Gas</b> (faint wisps) falls together under gravity until a
     knot collapses and <b>ignites</b> — a star is born, its colour set by its mass: red
@@ -248,6 +255,8 @@
 </div>
 
 <div id="toasts"></div>
+
+<div id="followCard"></div>
 
 <div id="zoomCtl">
   <button id="bZoomIn" title="Zoom in (+)" aria-label="Zoom in">＋</button>

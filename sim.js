@@ -1,4 +1,4 @@
-/* Sidereum — a living cosmos.
+/* Aevum — a living cosmos.
    One rule (gravity, via a Barnes-Hut quadtree) plus a stellar life cycle:
    gas collapses → stars ignite → giants swell → supernovae seed new gas →
    pulsars sweep, black holes feed. Nothing else is scripted. */
@@ -580,7 +580,7 @@ function bigBang(){
 }
 
 // ---- public API ----
-window.SIDEREUM = {
+window.AEVUM = {
   S, P, events,
   get N(){ return N; }, get era(){ return era; }, get cmb(){ return Math.max(0, cmbLeft)/420; },
   GAS, STAR, GIANT, WD, NS, BH, BD, MAGNETAR,

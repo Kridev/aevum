@@ -1,8 +1,8 @@
-/* Sidereum — renderer: camera, glow sprites, lifecycle visuals, effects.
+/* Aevum — renderer: camera, glow sprites, lifecycle visuals, effects.
    Owns the rAF loop; physics (sim.js) is advanced from here. */
 (() => {
 'use strict';
-const SIM = window.SIDEREUM;
+const SIM = window.AEVUM;
 const { S, P, events, GAS, STAR, GIANT, WD, NS, BH, BD, MAGNETAR } = SIM;
 
 const cv = document.getElementById('stage');
@@ -272,10 +272,38 @@ const cmbCv = (() => {
   return c;
 })();
 
-// ---- distant starfield (static, parallax) ----
+// ---- distant starfield + faraway galaxies (static, layered parallax) ----
 const FAR = [];
 for (let i=0;i<420;i++) FAR.push({ x:(Math.random()-0.5)*9000, y:(Math.random()-0.5)*9000, s:Math.random() });
+const smudgeSpr = (() => {   // an unresolved galaxy: a soft elliptical smudge
+  const s = 48, c = document.createElement('canvas'); c.width = c.height = s;
+  const g = c.getContext('2d');
+  const gr = g.createRadialGradient(s/2, s/2, 0, s/2, s/2, s/2);
+  gr.addColorStop(0, 'rgba(235,225,210,0.8)');
+  gr.addColorStop(0.35, 'rgba(190,180,200,0.3)');
+  gr.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, s, s);
+  return c;
+})();
+const FARG = [];
+for (let i=0;i<34;i++) FARG.push({
+  x:(Math.random()-0.5)*16000, y:(Math.random()-0.5)*16000,
+  a:Math.random()*Math.PI, sq:0.25+Math.random()*0.55,
+  s:5+Math.random()*13, p:0.1+Math.random()*0.12,
+});
 function drawFar(){
+  // island universes, almost motionless — depth for the void
+  for (const g of FARG){
+    const x = (g.x - cam.x*g.p) * cam.z*0.5 + W*0.5;
+    const y = (g.y - cam.y*g.p) * cam.z*0.5 + H*0.5;
+    if (x<-40||x>W+40||y<-40||y>H+40) continue;
+    ctx.save();
+    ctx.translate(x, y); ctx.rotate(g.a); ctx.scale(1, g.sq);
+    ctx.globalAlpha = 0.34;
+    const r = g.s * DPR;
+    ctx.drawImage(smudgeSpr, -r, -r, r*2, r*2);
+    ctx.restore();
+  }
   ctx.fillStyle = 'rgba(180,195,230,0.5)';
   const px = 0.25;   // parallax: the far field barely moves
   for (const f of FAR){
@@ -291,12 +319,23 @@ function drawFar(){
 
 // ---- transient effects (supernova rings, ignition pings, …) ----
 const fx = [];
+const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+let shake = 0, flashA = 0;   // a nearby supernova rocks the camera and floods the sky
 const listeners = [];        // audio / UI subscribe here
 SIM.onEvent = fn => listeners.push(fn);
 function drainEvents(){
   for (const e of events){
     for (const fn of listeners) fn(e);
-    if (e.t === 'sn')      fx.push({ k:'sn',    x:e.x, y:e.y, age:0, max:90, m:e.m });
+    if (e.t === 'sn'){
+      fx.push({ k:'sn', x:e.x, y:e.y, age:0, max:90, m:e.m });
+      if (!reduceMotion){
+        // the closer (and more zoomed-in) the blast, the harder it hits
+        const dx = sx(e.x)-W*0.5, dy = sy(e.y)-H*0.5;
+        const prox = Math.max(0, 1 - Math.hypot(dx,dy)/(W*0.8));
+        shake  = Math.min(13, shake + 9*prox*Math.min(1.6, cam.z+0.4));
+        flashA = Math.min(0.4, flashA + 0.3*prox*prox);
+      }
+    }
     else if (e.t === 'birth') fx.push({ k:'ping', x:e.x, y:e.y, age:0, max:26, m:e.m });
     else if (e.t === 'bhborn')fx.push({ k:'bh',   x:e.x, y:e.y, age:0, max:70, m:e.m });
     else if (e.t === 'kilonova') fx.push({ k:'kn', x:e.x, y:e.y, age:0, max:110, m:e.m });
@@ -393,6 +432,14 @@ function draw(){
   ctx.fillRect(0,0,W,H);
   camMoved = false;
 
+  // shock of a nearby supernova: brief camera judder (drawn, not simulated)
+  let shaken = false;
+  if (shake > 0.3){
+    ctx.save();
+    ctx.translate((Math.random()-0.5)*shake*DPR, (Math.random()-0.5)*shake*DPR);
+    shake *= 0.86; shaken = true;
+  } else shake = 0;
+
   // right after a big bang the whole sky still glows — the CMB, cooling away
   const cmb = SIM.cmb;
   if (cmb > 0){
@@ -454,6 +501,17 @@ function draw(){
     const px = sx(x), py = sy(y);
     const m = P.m[i];
     if (t === STAR){
+      // runaway stars (slingshots, supernova survivors) streak with motion
+      const vx = P.vx[i], vy = P.vy[i], v2 = vx*vx + vy*vy;
+      if (v2 > 4.5){
+        const sl = Math.min(11, Math.sqrt(v2)*2.4) * z * DPR;
+        const vn = sl / Math.sqrt(v2);
+        const sg = ctx.createLinearGradient(px - vx*vn, py - vy*vn, px, py);
+        sg.addColorStop(0, 'rgba(200,220,255,0)');
+        sg.addColorStop(1, 'rgba(200,220,255,0.4)');
+        ctx.strokeStyle = sg; ctx.lineWidth = DPR;
+        ctx.beginPath(); ctx.moveTo(px - vx*vn, py - vy*vn); ctx.lineTo(px, py); ctx.stroke();
+      }
       let r = Math.max(2.2, (2 + Math.pow(m,0.45)*2.6) * zStar) * DPR;
       // Cepheid variables breathe — brightness swells and dims on a steady beat
       if (P.spin[i] > 0) r *= 1 + 0.3*Math.sin(eraNow*P.spin[i]*0.8 + P.hue[i]);
@@ -690,6 +748,12 @@ function draw(){
   }
 
   ctx.globalCompositeOperation = 'source-over';
+  if (shaken) ctx.restore();
+  if (flashA > 0.01){
+    ctx.fillStyle = `rgba(255,244,228,${flashA})`;
+    ctx.fillRect(0,0,W,H);
+    flashA *= 0.84;
+  } else flashA = 0;
 }
 
 // ---- main loop + fps ----
@@ -706,6 +770,7 @@ function frame(t){
     el.style.color = fps >= 50 ? '#7df3b0' : fps >= 30 ? '#ffd166' : '#ff5d73';
   }
   SIM.update();
+  tourStep(t);
   easeZoom();
   applyFollow();
   drainEvents();
@@ -716,13 +781,49 @@ function frame(t){
   requestAnimationFrame(frame);
 }
 
+// ---- cinematic tour (used by 📺 Auto): drift wide, sidle up to a celebrity,
+// dwell, pull back — a planetarium that films itself ----
+let tourOn = false, tourPhase = 0, tourNext = 0;
+function tourStep(now){
+  if (!tourOn || pointers.size) return;   // hands on the controls = tour yields
+  if (now < tourNext) return;
+  if (tourPhase === 0){
+    // find someone worth visiting: black holes > remnants > giants > big stars
+    let best = -1, bs = 0;
+    for (let i=0;i<SIM.N;i++){
+      const t = P.type[i];
+      let s = t===BH ? 3 : (t===MAGNETAR||t===NS) ? 2.5 : t===GIANT ? 2
+            : (t===STAR && P.m[i] > 8) ? 1.5 : 0;
+      if (s > 0) s += Math.random();
+      if (s > bs){ bs = s; best = i; }
+    }
+    if (best >= 0){
+      followId = P.id[best]; followIdx = best;
+      zTarget = 1.7 + Math.random()*1.8; anchorX = anchorY = -1;
+      tourPhase = 1; tourNext = now + 9000 + Math.random()*6000;
+      return;
+    }
+    tourNext = now + 3000;   // nothing notable yet — check back soon
+  } else {
+    stopFollow();
+    zTarget = 0.28 + Math.random()*0.22; anchorX = anchorY = -1;
+    tourPhase = 0; tourNext = now + 7000 + Math.random()*5000;
+  }
+}
+
 SIM.cam = cam;
 SIM.recenter = recenter;
 SIM.zoomBy = f => requestZoom(W*0.5, H*0.5, f);   // keyboard / button zoom, centred
+SIM.setTour = on => { tourOn = on; tourPhase = 0; tourNext = 0; if (!on){ stopFollow(); } };
+SIM.followInfo = () => {
+  if (!followId || followIdx < 0 || followIdx >= SIM.N || P.id[followIdx] !== followId) return null;
+  const i = followIdx;
+  return { type: P.type[i], m: P.m[i], age: P.age[i], life: P.life[i],
+           v: Math.hypot(P.vx[i], P.vy[i]), feed: P.hue[i], spin: P.spin[i] };
+};
 SIM.fpsNow = () => fps;
 
 // ---- boot: a spiral galaxy, unless a shared link will restore state (tools.js) ----
-const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 if (!location.hash || location.hash.length < 5){
   if (reduceMotion) SIM.spawnSpiral(0, 0, 4200, 850, 1, 0, 0);
   else SIM.bigBang();

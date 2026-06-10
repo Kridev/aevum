@@ -1,7 +1,7 @@
-/* Sidereum — UI: sliders, seed buttons, toggles, HUD census, toasts, keys */
+/* Aevum — UI: sliders, seed buttons, toggles, HUD census, toasts, keys */
 (() => {
 'use strict';
-const SIM = window.SIDEREUM;
+const SIM = window.AEVUM;
 const { S, P } = SIM;
 const $ = id => document.getElementById(id);
 
@@ -68,8 +68,41 @@ bAuto.onclick = () => {
   autoOn = !autoOn;
   bAuto.classList.toggle('active', autoOn);
   clearInterval(autoTimer);
-  if (autoOn){ autoStep(); autoTimer = setInterval(autoStep, 45000); }
+  SIM.setTour(autoOn);   // the camera films itself: drift, approach, dwell
+  if (autoOn){ autoStep(); autoTimer = setInterval(autoStep, 75000); }
 };
+
+// ---- telemetry for the followed body ----
+const followCard = $('followCard');
+function followName(f){
+  const T = SIM;
+  switch (f.type){
+    case T.BH: return f.feed > 48 && f.m > 400 ? '🕳️ quasar' : '🕳️ black hole';
+    case T.NS: return '🌟 pulsar';
+    case T.MAGNETAR: return '⚡ magnetar';
+    case T.GIANT: return '🔴 red giant';
+    case T.WD: return '⚪ white dwarf';
+    case T.BD: return '🟤 brown dwarf';
+    default:
+      if (f.m > 24) return '💜 Wolf-Rayet star';
+      if (f.spin > 0) return '✨ Cepheid variable';
+      if (f.m < 0.45) return '🔻 red dwarf';
+      if (f.m < 1.6) return '🌞 sun-like star';
+      if (f.m < 8) return '⭐ blue-white star';
+      return '🔵 blue giant';
+  }
+}
+setInterval(() => {
+  const f = SIM.followInfo();
+  if (!f){ followCard.style.display = 'none'; return; }
+  let txt = `${followName(f)} · <b>${f.m < 10 ? f.m.toFixed(1) : f.m|0} M☉</b>`;
+  if (f.type === SIM.STAR || f.type === SIM.GIANT)
+    txt += ` · life <b>${Math.min(99, 100*f.age/f.life)|0}%</b>`;
+  if (f.type === SIM.BH && f.feed > 4) txt += ' · <b>feeding</b>';
+  txt += ` · v <b>${f.v.toFixed(1)}</b>`;
+  followCard.innerHTML = txt;
+  followCard.style.display = 'block';
+}, 300);
 
 // ---- HUD census ----
 setInterval(() => {
@@ -149,7 +182,7 @@ addEventListener('keydown', e => {
   }
 });
 
-window.SIDEREUM_UI = {
+window.AEVUM_UI = {
   get lastScene(){ return lastScene; },
   runScene,
   syncControls(){

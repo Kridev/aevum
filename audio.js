@@ -1,4 +1,4 @@
-/* Sidereum — the sound of space, synthesized live (no audio files).
+/* Aevum — the sound of space, synthesized live (no audio files).
    Layers: 🌑 Drone (sub-bass bed, DRY only) · 🎹 Pad (slow original chords)
    · ✨ Chimes (stars ignite) · 📡 Events (supernovae, black holes, pulsars).
    Routing rule (learned the hard way): continuous beds go to the dry master
@@ -6,7 +6,7 @@
    cathedral-of-space tail always has silence to decay into. */
 (() => {
 'use strict';
-const SIM = window.SIDEREUM;
+const SIM = window.AEVUM;
 const $ = id => document.getElementById(id);
 
 let actx = null, out = null, send = null, padBus = null, started = false;
@@ -265,5 +265,5 @@ function toggle(name, btn){
 [['drone','bDrone'],['pad','bPad'],['chimes','bChimes'],['events','bEvents']]
   .forEach(([name,id]) => { const b = $(id); if (b) b.onclick = () => toggle(name, b); });
 
-window.SIDEREUM_AUDIO = { layers, get started(){ return started; } };
+window.AEVUM_AUDIO = { layers, get started(){ return started; } };
 })();

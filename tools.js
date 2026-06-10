@@ -1,7 +1,7 @@
-/* Sidereum — PNG export, video capture, save / load / share, fullscreen, intro */
+/* Aevum — PNG export, video capture, save / load / share, fullscreen, intro */
 (() => {
 'use strict';
-const SIM = window.SIDEREUM;
+const SIM = window.AEVUM;
 const { S } = SIM;
 const $ = id => document.getElementById(id);
 function flash(msg){ const s = $('status'); s.textContent = msg; clearTimeout(flash._t); flash._t = setTimeout(()=>s.textContent='', 2600); }
@@ -12,7 +12,7 @@ $('bSnap').onclick = () => {
   cv.toBlob(blob => {
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `sidereum-${Date.now()}.png`;
+    a.download = `aevum-${Date.now()}.png`;
     a.click();
     setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
     flash('saved PNG');
@@ -37,7 +37,7 @@ bRec.onclick = () => {
     const blob = new Blob(chunks, { type: 'video/webm' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `sidereum-${Date.now()}.webm`;
+    a.download = `aevum-${Date.now()}.webm`;
     a.click();
     setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
     recorder = null; bRec.classList.remove('active'); bRec.textContent = '🎬 Record';
@@ -54,20 +54,20 @@ function serialise(){
     v: 1,
     time: +S.timeScale.toFixed(2), grav: +S.gravity.toFixed(2), form: +S.formRate.toFixed(2),
     glow: S.glow, trails: S.trails, labels: S.labels,
-    scene: window.SIDEREUM_UI ? window.SIDEREUM_UI.lastScene : 'bigbang',
+    scene: window.AEVUM_UI ? window.AEVUM_UI.lastScene : 'bigbang',
   };
 }
 function apply(st, reseed){
   S.timeScale = st.time; S.gravity = st.grav; S.formRate = st.form;
   S.glow = !!st.glow; S.trails = !!st.trails; S.labels = !!st.labels;
-  const UI = window.SIDEREUM_UI;
+  const UI = window.AEVUM_UI;
   if (UI){ UI.syncControls(); if (reseed && st.scene) UI.runScene(st.scene); }
 }
 
 // ---- save / load (localStorage) ----
-$('bSave').onclick = () => { localStorage.setItem('sidereum', JSON.stringify(serialise())); flash('saved to this browser'); };
+$('bSave').onclick = () => { localStorage.setItem('aevum', JSON.stringify(serialise())); flash('saved to this browser'); };
 $('bLoad').onclick = () => {
-  const raw = localStorage.getItem('sidereum');
+  const raw = localStorage.getItem('aevum');
   if (!raw){ flash('nothing saved yet'); return; }
   try { apply(JSON.parse(raw), true); flash('loaded'); } catch(e){ flash('load failed'); }
 };

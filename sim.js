@@ -523,13 +523,50 @@ function spawnElliptical(cx, cy, count, R){
   }
 }
 function spawnNebula(cx, cy, count, R){
+  // a molecular cloud is not a disc of confetti: it's sweeping FILAMENTS,
+  // dense cores knotted along them, and a faint ragged envelope
   const swirl = (Math.random()<0.5?-1:1) * (0.15+Math.random()*0.25);
-  for (let k=0;k<count && N<MAX;k++){
-    const r=R*Math.sqrt(Math.random()), th=Math.random()*6.2832;
-    const tx=-Math.sin(th), ty=Math.cos(th);
-    addP(cx+Math.cos(th)*r, cy+Math.sin(th)*r,
-         tx*swirl*r/R + (Math.random()-0.5)*0.3,
-         ty*swirl*r/R + (Math.random()-0.5)*0.3, GAS_M, GAS);
+  const g = () => (Math.random()+Math.random()+Math.random()-1.5)*0.667;   // ~gaussian
+  const put = (x, y) => {
+    const dx=x-cx, dy=y-cy, r=Math.max(8, Math.hypot(dx,dy));
+    addP(x, y, -dy/r*swirl*(r/R) + (Math.random()-0.5)*0.3,
+                dx/r*swirl*(r/R) + (Math.random()-0.5)*0.3, GAS_M, GAS);
+  };
+  // 3–5 curved strands (quadratic arcs through the region)
+  const nFil = 3 + (Math.random()*3|0);
+  const nf = Math.round(count*0.45/nFil);
+  const knots = [];
+  for (let f=0; f<nFil; f++){
+    const a0=Math.random()*6.2832, a1=a0+2+Math.random()*2.3, am=(a0+a1)/2+(Math.random()-0.5);
+    const x0=cx+Math.cos(a0)*R*(0.3+Math.random()*0.7), y0=cy+Math.sin(a0)*R*(0.3+Math.random()*0.7);
+    const xm=cx+Math.cos(am)*R*(0.2+Math.random()*0.9), ym=cy+Math.sin(am)*R*(0.2+Math.random()*0.9);
+    const x1=cx+Math.cos(a1)*R*(0.3+Math.random()*0.7), y1=cy+Math.sin(a1)*R*(0.3+Math.random()*0.7);
+    const w = R*0.05*(0.6+Math.random());
+    for (let k=0;k<nf && N<MAX;k++){
+      const t=Math.random(), u=1-t;
+      const bx=u*u*x0+2*u*t*xm+t*t*x1, by=u*u*y0+2*u*t*ym+t*t*y1;
+      put(bx+g()*w*2, by+g()*w*2);
+      if ((k&15)===0) knots.push([bx, by]);
+    }
+  }
+  // dense cores — most of them knotted onto the filaments
+  const nCl = 5 + (Math.random()*4|0);
+  const ncl = Math.round(count*0.4/nCl);
+  for (let c=0;c<nCl;c++){
+    let px, py;
+    if (knots.length && Math.random()<0.7){
+      const p = knots[(Math.random()*knots.length)|0]; px=p[0]; py=p[1];
+    } else {
+      const a=Math.random()*6.2832, rr=R*0.9*Math.sqrt(Math.random());
+      px=cx+Math.cos(a)*rr; py=cy+Math.sin(a)*rr;
+    }
+    const cs = R*(0.08+Math.random()*0.1);
+    for (let k=0;k<ncl && N<MAX;k++) put(px+g()*cs*2, py+g()*cs*2);
+  }
+  // the faint outer envelope, ragged and thin
+  for (let k=0;k<count*0.15 && N<MAX;k++){
+    const a=Math.random()*6.2832, rr=R*(0.35+Math.random()*0.85);
+    put(cx+Math.cos(a)*rr+g()*R*0.1, cy+Math.sin(a)*rr+g()*R*0.1);
   }
 }
 function spawnCluster(cx, cy, count, R){

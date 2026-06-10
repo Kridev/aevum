@@ -11,6 +11,9 @@ const ctx = cv.getContext('2d', { alpha: false });
 // blobs cost 4× less fill, and the blur from upscaling actually helps the look
 const gasCv = document.createElement('canvas');
 const gctx = gasCv.getContext('2d');
+// scratch canvas for the gravitational-lens trick around black holes
+const lensCv = document.createElement('canvas'); lensCv.width = lensCv.height = 256;
+const lctx = lensCv.getContext('2d');
 let W, H, DPR;
 function resize(){
   DPR = Math.min(2, window.devicePixelRatio || 1);
@@ -496,8 +499,28 @@ function draw(){
         }
         ctx.globalAlpha = 1;
       }
-      // the hole itself: a disc of true black with a thin photon ring
       ctx.globalCompositeOperation = 'source-over';
+      // gravitational lensing: light from behind the hole reappears inverted
+      // in an Einstein ring around it (180°-rotated copy of the backdrop,
+      // clipped to an annulus). Faked, but it bends the right way.
+      const lensR = core * 2.6;
+      if (lensR > 5*DPR && lensR < 128 &&
+          px-lensR >= 0 && py-lensR >= 0 && px+lensR < W && py+lensR < H){
+        const d = Math.ceil(lensR);
+        lctx.clearRect(0, 0, d*2, d*2);
+        lctx.save();
+        lctx.beginPath();
+        lctx.arc(d, d, lensR*0.96, 0, 6.2832);
+        lctx.arc(d, d, core*1.05, 0, 6.2832, true);
+        lctx.clip();
+        lctx.translate(d, d); lctx.rotate(Math.PI); lctx.translate(-d, -d);
+        lctx.drawImage(cv, px-d, py-d, d*2, d*2, 0, 0, d*2, d*2);
+        lctx.restore();
+        ctx.globalAlpha = 0.75;
+        ctx.drawImage(lensCv, 0, 0, d*2, d*2, px-d, py-d, d*2, d*2);
+        ctx.globalAlpha = 1;
+      }
+      // the hole itself: a disc of true black with a thin photon ring
       ctx.fillStyle = '#000';
       ctx.beginPath(); ctx.arc(px, py, core, 0, 6.2832); ctx.fill();
       ctx.strokeStyle = 'rgba(255,200,120,0.8)'; ctx.lineWidth = Math.max(0.7, core*0.16);

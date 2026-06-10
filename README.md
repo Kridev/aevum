@@ -20,9 +20,14 @@ The bestiary runs deeper: failed collapses smoulder as **brown dwarfs**,
 **Wolf-Rayets**, a fifth of dead cores spin up into flaring **magnetars**
 wrapped in **pulsar wind nebulae**, black-hole births stab the sky with
 **gamma-ray bursts**, and white dwarfs siphoning a swollen neighbour erupt in
-**novae**. Dusty gas forms **dark nebulae** that carve lanes through the glow.
-Zoom in past 2× and stars resolve into little **planetary systems**. Turn on
-🏷️ Labels and the sim names its own celebrities.
+**novae**, while neutron stars feeding on one blink as **X-ray binaries**.
+Dusty gas forms **dark nebulae** that carve lanes through the glow, and black
+holes **gravitationally lens** the light behind them into an Einstein ring.
+Zoom in past 2× and stars resolve into little **planetary systems** — some
+with asteroid belts, some trailing **comets** that brighten near periapsis.
+For a few moments after the Big Bang the whole sky glows with the **cosmic
+microwave background**. Turn on 🏷️ Labels and the sim names its own
+celebrities.
 
 ## How it works
 

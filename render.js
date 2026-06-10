@@ -14,6 +14,9 @@ const gctx = gasCv.getContext('2d');
 // scratch canvas for the gravitational-lens trick around black holes
 const lensCv = document.createElement('canvas'); lensCv.width = lensCv.height = 256;
 const lctx = lensCv.getContext('2d');
+// coarse screen-space starlight grid — how brightly lit is each patch of sky
+const LG_C = 40, LG_R = 24;
+const lightG = new Float32Array(LG_C * LG_R);
 let W, H, DPR;
 function resize(){
   DPR = Math.min(2, window.devicePixelRatio || 1);
@@ -209,14 +212,22 @@ function makeCloud(core, halo){
   }
   return c;
 }
+// a full palette wheel — the hue field in sim.js sweeps through these, so
+// neighbouring clouds blend and distant regions contrast (crimson nebulae
+// here, teal ones there, gold ejecta where stars have died)
 const GAS_TINTS = [
-  ['rgba(130,170,255,0.5)', 'rgba(60,90,200,0.22)'],
-  ['rgba(190,130,255,0.5)', 'rgba(110,60,200,0.22)'],
-  ['rgba(120,225,235,0.5)', 'rgba(40,130,160,0.22)'],
-  ['rgba(255,140,190,0.5)', 'rgba(180,50,110,0.22)'],
+  ['rgba(255,110,110,0.5)', 'rgba(170,40,60,0.22)'],    // crimson
+  ['rgba(255,160,100,0.5)', 'rgba(170,80,40,0.22)'],    // rust
+  ['rgba(255,210,120,0.5)', 'rgba(170,120,40,0.22)'],   // gold
+  ['rgba(170,230,170,0.5)', 'rgba(60,140,90,0.22)'],    // sage
+  ['rgba(120,225,235,0.5)', 'rgba(40,130,160,0.22)'],   // teal
+  ['rgba(130,170,255,0.5)', 'rgba(60,90,200,0.22)'],    // blue
+  ['rgba(190,130,255,0.5)', 'rgba(110,60,200,0.22)'],   // violet
+  ['rgba(255,140,190,0.5)', 'rgba(180,50,110,0.22)'],   // magenta
 ];
-const GAS_SPRS = [];
-for (const [c1, c2] of GAS_TINTS){ GAS_SPRS.push(makeCloud(c1, c2), makeCloud(c1, c2)); }
+const GAS_SPRS = GAS_TINTS.map(([c1, c2]) => makeCloud(c1, c2));
+// an ionized HII region: gas lit white-pink by the hot young stars inside it
+const emisSpr = makeCloud('rgba(255,205,215,0.6)', 'rgba(255,140,160,0.28)');
 
 // diffraction spikes — the telescope signature of a bright point source.
 // Four main axis-aligned arms plus faint diagonals, pre-rendered once.
@@ -328,6 +339,10 @@ function drainEvents(){
     for (const fn of listeners) fn(e);
     if (e.t === 'sn'){
       fx.push({ k:'sn', x:e.x, y:e.y, age:0, max:90, m:e.m });
+      // …and a remnant: a tattered filamentary shell that lingers and expands
+      const jit = new Float32Array(28);
+      for (let j=0;j<28;j++) jit[j] = Math.random()*2 - 1;
+      fx.push({ k:'snr', x:e.x, y:e.y, age:0, max:560, m:e.m, jit });
       if (!reduceMotion){
         // the closer (and more zoomed-in) the blast, the harder it hits
         const dx = sx(e.x)-W*0.5, dy = sy(e.y)-H*0.5;
@@ -408,6 +423,21 @@ function drawFx(){
       ctx.moveTo(x - Math.cos(f.a)*L, y - Math.sin(f.a)*L);
       ctx.lineTo(x + Math.cos(f.a)*L, y + Math.sin(f.a)*L);
       ctx.stroke();
+    } else if (f.k === 'snr'){
+      // supernova remnant: ragged arcs, cool blue filaments threaded with
+      // shocked amber — expansion fast at first, then stalling (~sqrt t)
+      const r0 = (130 + f.m*3.5) * Math.min(1, Math.sqrt(f.age/110)) * cam.z;
+      if (r0 < 3) continue;
+      const fade = (1-t)*(1-t);
+      const segs = 28, J = f.jit;
+      ctx.lineWidth = Math.max(0.8, 1.6*cam.z*DPR);
+      for (let s=0;s<segs;s++){
+        const a0 = s/segs*6.2832, a1 = (s+0.8)/segs*6.2832;
+        const rr = r0 * (1 + J[s]*0.16 + 0.05*Math.sin(f.age*0.013 + s*2.4));
+        ctx.globalAlpha = fade * (0.3 + 0.35*Math.abs(J[(s+7)%segs]));
+        ctx.strokeStyle = J[s] > 0.15 ? 'rgba(150,210,255,1)' : 'rgba(255,170,100,1)';
+        ctx.beginPath(); ctx.arc(x, y, rr, a0, a1); ctx.stroke();
+      }
     } else if (f.k === 'nova'){
       const r = (4 + 26*t) * cam.z + 2;
       ctx.globalAlpha = 0.8 * (1-t);
@@ -460,18 +490,46 @@ function draw(){
   // gas first (wisps on the half-res layer), then stars on top at full res
   gctx.clearRect(0, 0, gasCv.width, gasCv.height);
   gctx.globalCompositeOperation = 'lighter';
+  // ---- starlight grid: splat the hot stars so gas knows how lit it is.
+  // Gas near young massive stars glows as a white-pink HII region; gas far
+  // from any star stays a cold dim cloud — exactly how the sky works.
+  lightG.fill(0);
+  for (let i=0;i<N;i++){
+    const t = P.type[i];
+    if (t !== STAR || P.m[i] < 3) continue;
+    const x = P.x[i]; if (x<x0||x>x1) continue;
+    const y = P.y[i]; if (y<y0||y>y1) continue;
+    const gx = (sx(x)/W*LG_C)|0, gy = (sy(y)/H*LG_R)|0;
+    const lum = Math.min(2.2, P.m[i]*0.13);
+    for (let oy=-1;oy<=1;oy++){
+      const yy = gy+oy; if (yy<0||yy>=LG_R) continue;
+      for (let ox=-1;ox<=1;ox++){
+        const xx = gx+ox; if (xx<0||xx>=LG_C) continue;
+        lightG[yy*LG_C+xx] += lum * (ox===0&&oy===0 ? 1 : 0.4);
+      }
+    }
+  }
+
   // clouds grow sublinearly with zoom, so zooming in resolves nebulae into
   // wisps and filaments instead of inflating them into airbrushed balls
   const zCloud = z <= 1 ? z : Math.pow(z, 0.6);
-  gctx.globalAlpha = Math.min(0.55, 0.34 + 0.07/z);
+  const gasA = Math.min(0.55, 0.34 + 0.07/z);
   const gasR0 = Math.max(4, 10*zCloud) * DPR;   // half-res radius
   for (let i=0;i<N;i++){
     if (P.type[i] !== GAS || P.spin[i] > 0) continue;
     const x = P.x[i]; if (x<x0||x>x1) continue;
     const y = P.y[i]; if (y<y0||y>y1) continue;
-    const spr = GAS_SPRS[((P.hue[i]*0.0111)|0) & 7];
-    const gasR = gasR0 * (0.7 + (P.hue[i]%37)*0.016);   // varied wisp sizes
-    gctx.drawImage(spr, sx(x)*0.5-gasR, sy(y)*0.5-gasR, gasR*2, gasR*2);
+    const hx = sx(x), hy = sy(y);
+    const hue = ((P.hue[i] % 360) + 360) % 360;
+    const spr = GAS_SPRS[(hue/45)|0];
+    const gasR = gasR0 * (0.7 + (hue%37)*0.016);   // varied wisp sizes
+    const lit = lightG[Math.min(LG_R-1, (hy/H*LG_R)|0)*LG_C + Math.min(LG_C-1, (hx/W*LG_C)|0)];
+    gctx.globalAlpha = gasA * Math.min(1.9, 0.85 + lit*0.8);
+    gctx.drawImage(spr, hx*0.5-gasR, hy*0.5-gasR, gasR*2, gasR*2);
+    if (lit > 0.35){   // ionization glow takes over near the hot stars
+      gctx.globalAlpha = Math.min(0.75, (lit-0.35)*0.7);
+      gctx.drawImage(emisSpr, hx*0.5-gasR, hy*0.5-gasR, gasR*2, gasR*2);
+    }
   }
   ctx.drawImage(gasCv, 0, 0, W, H);
 

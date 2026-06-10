@@ -51,7 +51,10 @@ function addP(x, y, vx, vy, m, type){
   P.x[i] = x; P.y[i] = y; P.vx[i] = vx; P.vy[i] = vy;
   P.m[i] = m; P.type[i] = type; P.age[i] = 0;
   P.life[i] = type === STAR ? lifeOf(m) : 1e9;
-  P.hue[i] = Math.random() * 360;
+  // gas takes its tint from a smooth spatial field, so each cloud owns a
+  // coherent palette (a crimson nebula HERE, a teal one THERE) instead of
+  // per-particle confetti that averages to mush
+  P.hue[i] = type === GAS ? hueField(x, y) + (Math.random()-0.5)*22 : Math.random() * 360;
   // spin doubles as: gas → dust flag (dark nebula wisp), star → Cepheid pulse rate
   P.spin[i] = 0;
   if (type === GAS && Math.random() < 0.22) P.spin[i] = 1;
@@ -67,6 +70,15 @@ function killP(i){          // swap-with-last
     P.type[i]=P.type[N]; P.hue[i]=P.hue[N]; P.spin[i]=P.spin[N];
     P.id[i]=P.id[N];
   }
+}
+
+// the colour field: three drifting sine waves → smooth 0..360 hue regions.
+// reseeded per universe so every cosmos wears different nebula colours.
+let hp1 = 1.3, hp2 = 4.1, hp3 = 2.2;
+function reseedHues(){ hp1 = Math.random()*6.28; hp2 = Math.random()*6.28; hp3 = Math.random()*6.28; }
+function hueField(x, y){
+  const v = Math.sin(x*0.0042 + hp1) + Math.sin(y*0.0035 + hp2) + Math.sin((x*0.6 + y)*0.0021 + hp3);
+  return ((v + 3) / 6) * 360;
 }
 
 // massive stars burn fast and die loud; dwarfs smoulder for ages.
@@ -241,8 +253,10 @@ function evolve(dt){
 function puffGas(i, n, speed){
   for (let k=0;k<n;k++){
     const a = Math.random()*6.2832, v = speed*(0.5+Math.random());
-    addP(P.x[i]+Math.cos(a)*3, P.y[i]+Math.sin(a)*3,
+    const j = addP(P.x[i]+Math.cos(a)*3, P.y[i]+Math.sin(a)*3,
          P.vx[i]+Math.cos(a)*v, P.vy[i]+Math.sin(a)*v, GAS_M, GAS);
+    // stellar ejecta is enriched: it glows in warm rust-and-gold tones
+    if (j >= 0) P.hue[j] = 50 + Math.random()*50;
   }
 }
 function supernova(i){
@@ -395,7 +409,7 @@ function update(){
 }
 
 // ---- spawners ----
-function clearAll(){ N = 0; era = 0; events.length = 0; }
+function clearAll(){ N = 0; era = 0; events.length = 0; reseedHues(); }
 
 function circVel(r, Menc){ return Math.sqrt(G0*S.gravity*Math.max(1,Menc)/Math.max(8,r)); }
 

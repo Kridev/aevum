@@ -236,6 +236,8 @@ const GAS_TINTS = [
 // four shape variants per tint — combined with per-wisp rotation below, no
 // two neighbouring clouds ever read as the same repeated stamp
 const GAS_SPRS = GAS_TINTS.map(([c1, c2]) => [makeCloud(c1,c2), makeCloud(c1,c2), makeCloud(c1,c2), makeCloud(c1,c2)]);
+// smooth featureless versions for far-out views — at distance, texture melts
+const SOFT_SPRS = GAS_TINTS.map(([c1, c2]) => makeSprite(c1, c2));
 // an ionized HII region: gas lit white-pink by the hot young stars inside it
 const emisSpr = makeCloud('rgba(255,205,215,0.6)', 'rgba(255,140,160,0.28)');
 // the bright ionized edge of a sculpted dust pillar
@@ -536,10 +538,14 @@ function draw(){
   }
 
   // clouds grow sublinearly with zoom, so zooming in resolves nebulae into
-  // wisps and filaments instead of inflating them into airbrushed balls
+  // wisps and filaments instead of inflating them into airbrushed balls.
+  // Zoomed far OUT, wisps widen and fade so they merge into one continuous
+  // cloud — distance should blur, not pixelate into hard clumps.
   const zCloud = z <= 1 ? z : Math.pow(z, 0.6);
-  const gasA = Math.min(0.55, 0.34 + 0.07/z);
-  const gasR0 = Math.max(4, 10*zCloud) * DPR;   // half-res radius
+  const lowZ = z < 0.5;
+  const spread = lowZ ? Math.min(2.2, Math.pow(0.5/z, 0.7)) : 1;
+  const gasA = Math.min(0.55, 0.34 + 0.07/z) / Math.pow(spread, 1.5);
+  const gasR0 = Math.max(4, 10*zCloud) * DPR * spread;   // half-res radius
   for (let i=0;i<N;i++){
     if (P.type[i] !== GAS || P.spin[i] > 0) continue;
     const x = P.x[i]; if (x<x0||x>x1) continue;
@@ -547,7 +553,7 @@ function draw(){
     const hx = sx(x), hy = sy(y);
     const hue = ((P.hue[i] % 360) + 360) % 360;
     const h = (P.id[i]*2654435761)>>>0;
-    const spr = GAS_SPRS[(hue/45)|0][h & 3];
+    const spr = lowZ ? SOFT_SPRS[(hue/45)|0] : GAS_SPRS[(hue/45)|0][h & 3];
     const gasR = gasR0 * (0.7 + (hue%37)*0.016);   // varied wisp sizes
     const lit = lightG[Math.min(LG_R-1, (hy/H*LG_R)|0)*LG_C + Math.min(LG_C-1, (hx/W*LG_C)|0)];
     // stable per-wisp rotation (and the odd mirror) — kills stamp repetition
@@ -569,8 +575,9 @@ function draw(){
   // pointing away from the light, and its star-facing edge ionizes and glows —
   // the Pillars-of-Creation anatomy. (rims collected here, drawn additively after)
   ctx.globalCompositeOperation = 'source-over';
-  ctx.globalAlpha = 0.55;
-  const dustR = Math.max(5, 12*zCloud) * DPR;
+  const dustA = 0.55 / Math.pow(spread, 0.9);
+  ctx.globalAlpha = dustA;
+  const dustR = Math.max(5, 12*zCloud) * DPR * spread;
   let nRim = 0;
   for (let i=0;i<N;i++){
     if (P.type[i] !== GAS || P.spin[i] === 0) continue;
@@ -591,7 +598,7 @@ function draw(){
       const ang = Math.atan2(dgy, dgx) + (((h>>9)&15) - 7.5) * 0.055;
       const stretch = 1.3 + Math.min(0.75, glen*0.6) + (h&7)*0.05;
       // against a glowing backdrop, dust reads as a near-black silhouette
-      ctx.globalAlpha = Math.min(0.85, 0.55 + lit*0.18);
+      ctx.globalAlpha = Math.min(0.85, dustA + lit*0.18);
       ctx.save();
       ctx.translate(hx, hy);
       ctx.rotate(ang);
@@ -610,7 +617,7 @@ function draw(){
       ctx.save();
       ctx.translate(hx, hy);
       ctx.rotate((h>>3)*1.2e-8);
-      ctx.globalAlpha = 0.55;
+      ctx.globalAlpha = dustA;
       ctx.drawImage(spr, -dustR, -dustR, dustR*2, dustR*2);
       ctx.restore();
     }

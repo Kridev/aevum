@@ -281,14 +281,15 @@ const cmbCv = (() => {
   const g = c.getContext('2d');
   const img = g.createImageData(s, s);
   for (let i=0;i<s*s;i++){
-    // smooth-ish anisotropies: sum of a couple of random-phase waves per pixel
+    // smooth-ish anisotropies: sum of a few random-phase waves per pixel —
+    // finer grain and deep-ember red, so it reads as relic heat, not mud
     const x = i % s, y = (i / s)|0;
-    const v = Math.sin(x*0.31+1.7)*Math.sin(y*0.27+0.4) + Math.sin((x+y)*0.19+3.1)
-            + Math.sin(x*0.11-y*0.13+5.2);
-    const t = 0.5 + v*0.16;
-    img.data[i*4]   = 255*Math.min(1, t*1.15);
-    img.data[i*4+1] = 255*Math.min(1, t*0.62);
-    img.data[i*4+2] = 255*Math.min(1, t*0.45);
+    const v = Math.sin(x*0.61+1.7)*Math.sin(y*0.53+0.4) + Math.sin((x+y)*0.37+3.1)
+            + Math.sin(x*0.23-y*0.27+5.2) + 0.5*Math.sin(x*0.09+y*0.07+2.2);
+    const t = 0.4 + v*0.11;
+    img.data[i*4]   = 255*Math.min(1, t);
+    img.data[i*4+1] = 255*Math.min(1, t*0.38);
+    img.data[i*4+2] = 255*Math.min(1, t*0.26);
     img.data[i*4+3] = 255;
   }
   g.putImageData(img, 0, 0);
@@ -482,12 +483,18 @@ function draw(){
     shake *= 0.86; shaken = true;
   } else shake = 0;
 
-  // right after a big bang the whole sky still glows — the CMB, cooling away
+  // right after a big bang the whole sky still glows — white-hot at first,
+  // cooling through ember-red, gone in seconds (recombination, sped up)
   const cmb = SIM.cmb;
   if (cmb > 0){
-    ctx.globalAlpha = cmb*cmb * 0.5;
+    ctx.globalAlpha = cmb*cmb*cmb * 0.34;
     ctx.imageSmoothingEnabled = true;
     ctx.drawImage(cmbCv, 0, 0, W, H);
+    if (cmb > 0.75){   // the first instants: still too hot to be transparent
+      ctx.globalAlpha = (cmb - 0.75) * 4 * 0.5;
+      ctx.fillStyle = '#ffe8ce';
+      ctx.fillRect(0, 0, W, H);
+    }
     ctx.globalAlpha = 1;
   }
 

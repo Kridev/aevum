@@ -570,14 +570,19 @@ function spawnCollision(){
 }
 function bigBang(){
   clearAll();
-  cmbLeft = 420;   // the relic glow of the hot young universe, fading as it cools
+  cmbLeft = 280;   // the relic glow of the hot young universe, fading as it cools
   // primordial density fluctuations: most matter starts in proto-clumps, the
   // rest is a thin fog. Gravity drags it into filaments — a little cosmic web —
   // and the knots collapse into the first stars.
   const H = 0.00055, swirl = 0.0005;
-  const put = (x,y) => addP(x, y,
-    x*H - y*swirl + (Math.random()-0.5)*0.3,
-    y*H + x*swirl + (Math.random()-0.5)*0.3, GAS_M, GAS);
+  // primordial gas is hydrogen and helium ONLY — no dust until the first
+  // supernovae forge metals; the dark lanes have to be earned
+  const put = (x,y) => {
+    const i = addP(x, y,
+      x*H - y*swirl + (Math.random()-0.5)*0.3,
+      y*H + x*swirl + (Math.random()-0.5)*0.3, GAS_M, GAS);
+    if (i >= 0) P.spin[i] = 0;
+  };
   for (let c=0;c<44;c++){
     const rc=1350*Math.sqrt(Math.random()), tc=Math.random()*6.2832;
     const cxp=Math.cos(tc)*rc, cyp=Math.sin(tc)*rc;

@@ -189,6 +189,15 @@ function formStars(){
     // collapse! sample a stellar mass, consume that much gas (momentum-conserving)
     const want = imf();
     const take = Math.min(arr.length, Math.max(3, Math.round(want / GAS_M)));
+    // eat the gas nearest the knot's centre, not random wisps across the
+    // cell — the void left behind is then a tidy cavity around the newborn
+    // instead of a square moth-hole (ugly at high formation rates)
+    let kx=0, ky=0;
+    for (const i of arr){ kx+=P.x[i]; ky+=P.y[i]; }
+    kx/=arr.length; ky/=arr.length;
+    arr.sort((a,b) =>
+      ((P.x[a]-kx)*(P.x[a]-kx)+(P.y[a]-ky)*(P.y[a]-ky)) -
+      ((P.x[b]-kx)*(P.x[b]-kx)+(P.y[b]-ky)*(P.y[b]-ky)));
     let mx=0,my=0,mvx=0,mvy=0,mm=0;
     for (let k=0;k<take;k++){
       const i=arr[k];

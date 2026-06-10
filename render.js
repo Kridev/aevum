@@ -515,11 +515,13 @@ function draw(){
   lightG.fill(0);
   for (let i=0;i<N;i++){
     const t = P.type[i];
-    if (t !== STAR || P.m[i] < 3) continue;
+    // only the rare hot O/B monsters ionize their surroundings — if every
+    // middling star glowed, the whole disk would white out (it did)
+    if (t !== STAR || P.m[i] < 7) continue;
     const x = P.x[i]; if (x<x0||x>x1) continue;
     const y = P.y[i]; if (y<y0||y>y1) continue;
     const gx = (sx(x)/W*LG_C)|0, gy = (sy(y)/H*LG_R)|0;
-    const lum = Math.min(2.2, P.m[i]*0.13);
+    const lum = Math.min(2.2, P.m[i]*0.1);
     // reach grows with brightness and zoom, so a monster star up close
     // floods (and sculpts) a whole neighbourhood of cloud
     const reach = Math.min(5, Math.max(1, Math.round(lum * (0.8 + z*0.8))));
@@ -552,10 +554,10 @@ function draw(){
     const ra = (h>>3)*1.2e-8, rc = Math.cos(ra), rs = Math.sin(ra);
     const fl = (h&64) ? 1 : -1;
     gctx.setTransform(rc*fl, rs, -rs*fl, rc, hx*0.5, hy*0.5);
-    gctx.globalAlpha = gasA * Math.min(1.9, 0.85 + lit*0.8);
+    gctx.globalAlpha = gasA * Math.min(1.55, 0.85 + lit*0.6);
     gctx.drawImage(spr, -gasR, -gasR, gasR*2, gasR*2);
-    if (lit > 0.35){   // ionization glow takes over near the hot stars
-      gctx.globalAlpha = Math.min(0.75, (lit-0.35)*0.7);
+    if (lit > 0.45){   // ionization glow takes over near the hot stars
+      gctx.globalAlpha = Math.min(0.6, (lit-0.45)*0.6);
       gctx.drawImage(emisSpr, -gasR, -gasR, gasR*2, gasR*2);
     }
   }

@@ -36,7 +36,8 @@ sun-like star lives minutes, not aeons, and the scales are artistic license.
 | **Seeds** | 🌀 Spiral · 🌌 Elliptical · 💫 Collision (two galaxies meet) · ☁️ Nebula · ✨ Cluster · 🪐 Binary (two black holes inspiral and merge) |
 | **💥 Big Bang** | primordial gas with seeded density fluctuations — watch a little cosmic web condense, then light up |
 | **View** | ✨ Glow · ☄️ Trails · 🏷️ Labels (names the quasars, pulsars and giants) |
-| **Camera** | drag to pan, scroll to zoom — from cosmic web down to a single accretion disk; `0` recenters |
+| **Camera** | drag to pan, scroll or pinch to zoom — from cosmic web down to a single accretion disk; click any star, pulsar or black hole to **ride along with it**; `0` recenters |
+| **📺 Auto** | hands-free planetarium: reseeds the void with a fresh scene every 45 s |
 | **Sound of space** | all synthesized live: 🌑 a sub-bass drone · 🎹 a slow original pad · ✨ chimes when stars ignite · 📡 events — supernovae boom, black holes growl, pulsars tick, mergers chirp |
 | **📷 PNG / 🎬 Record** | export a still or capture a WebM clip |
 | **Save / Load / Share** | persist your dials + scene, or copy a link that encodes them |
@@ -47,7 +48,7 @@ clock in Myr.
 
 ### Keyboard
 
-`Space` pause · `1–6` seeds · `B` big bang · `G` glow · `T` trails ·
+`Space` pause · `1–6` seeds · `B` big bang · `A` auto · `G` glow · `T` trails ·
 `L` labels · `0` recenter · `F` fullscreen · `H` panel · `?` help
 
 Append **`?nointro`** to the URL to skip the title card.

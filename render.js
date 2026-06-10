@@ -35,28 +35,91 @@ let camMoved = true;
 function sx(x){ return (x - cam.x) * cam.z + W * 0.5; }
 function sy(y){ return (y - cam.y) * cam.z + H * 0.5; }
 
-let dragging = false, lastPX = 0, lastPY = 0, downAt = 0;
-cv.addEventListener('pointerdown', e => {
-  dragging = true; lastPX = e.clientX; lastPY = e.clientY; downAt = performance.now();
-  cv.classList.add('dragging'); cv.setPointerCapture(e.pointerId);
-});
-cv.addEventListener('pointermove', e => {
-  if (!dragging) return;
-  cam.x -= (e.clientX - lastPX) * DPR / cam.z;
-  cam.y -= (e.clientY - lastPY) * DPR / cam.z;
-  lastPX = e.clientX; lastPY = e.clientY; camMoved = true;
-});
-addEventListener('pointerup', () => { dragging = false; cv.classList.remove('dragging'); });
-cv.addEventListener('wheel', e => {
-  e.preventDefault();
-  const f = Math.pow(1.0015, -e.deltaY);
-  const mx = e.clientX * DPR, my = e.clientY * DPR;
-  // zoom toward the cursor: keep the world point under it fixed
+// camera follow: ride along with a chosen body (click/tap to pick one)
+let followId = 0, followIdx = -1;
+function stopFollow(){ followId = 0; followIdx = -1; }
+function applyFollow(){
+  if (!followId) return;
+  if (followIdx < 0 || followIdx >= SIM.N || P.id[followIdx] !== followId){
+    followIdx = -1;
+    for (let i=0;i<SIM.N;i++) if (P.id[i] === followId){ followIdx = i; break; }
+    if (followIdx === -1){ stopFollow(); return; }   // it died / was devoured
+  }
+  cam.x = P.x[followIdx]; cam.y = P.y[followIdx]; camMoved = true;
+}
+function pickBody(mx, my){
+  // nearest body under the cursor, biased toward the interesting ones
+  const wx = (mx - W*0.5)/cam.z + cam.x, wy = (my - H*0.5)/cam.z + cam.y;
+  const reach = 26*DPR/cam.z, r2 = reach*reach;
+  let best = -1, bestScore = -1;
+  for (let i=0;i<SIM.N;i++){
+    if (P.type[i] === GAS) continue;
+    const dx=P.x[i]-wx, dy=P.y[i]-wy, d2=dx*dx+dy*dy;
+    if (d2 > r2) continue;
+    const t = P.type[i];
+    const score = (t===BH?4e6 : t===NS?3e6 : t===GIANT?2e6 : 1e6) + P.m[i]*1e3 - d2;
+    if (score > bestScore){ bestScore = score; best = i; }
+  }
+  return best;
+}
+
+function zoomAt(mx, my, f){
   const wx = (mx - W*0.5)/cam.z + cam.x, wy = (my - H*0.5)/cam.z + cam.y;
   cam.z = Math.min(8, Math.max(0.05, cam.z * f));
   cam.x = wx - (mx - W*0.5)/cam.z;
   cam.y = wy - (my - H*0.5)/cam.z;
   camMoved = true;
+}
+
+const pointers = new Map();   // active pointers, for drag + pinch
+let pinchDist = 0, downX = 0, downY = 0, downAt = 0, dragged = false;
+cv.addEventListener('pointerdown', e => {
+  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  downX = e.clientX; downY = e.clientY; downAt = performance.now(); dragged = false;
+  if (pointers.size === 2){
+    const [a, b] = [...pointers.values()];
+    pinchDist = Math.hypot(a.x-b.x, a.y-b.y);
+  }
+  cv.classList.add('dragging'); cv.setPointerCapture(e.pointerId);
+});
+cv.addEventListener('pointermove', e => {
+  const p = pointers.get(e.pointerId);
+  if (!p) return;
+  if (pointers.size === 2){
+    p.x = e.clientX; p.y = e.clientY;
+    const [a, b] = [...pointers.values()];
+    const d = Math.hypot(a.x-b.x, a.y-b.y);
+    if (pinchDist > 0 && d > 0){
+      zoomAt((a.x+b.x)*0.5*DPR, (a.y+b.y)*0.5*DPR, d/pinchDist);
+      stopFollow();
+    }
+    pinchDist = d; dragged = true;
+    return;
+  }
+  const dx = e.clientX - p.x, dy = e.clientY - p.y;
+  if (Math.abs(e.clientX-downX) + Math.abs(e.clientY-downY) > 6) dragged = true;
+  if (dragged){
+    cam.x -= dx * DPR / cam.z;
+    cam.y -= dy * DPR / cam.z;
+    camMoved = true; stopFollow();
+  }
+  p.x = e.clientX; p.y = e.clientY;
+});
+addEventListener('pointerup', e => {
+  pointers.delete(e.pointerId);
+  if (!pointers.size) cv.classList.remove('dragging');
+  pinchDist = 0;
+  // a quick, still tap = pick a body to follow (tap empty space to let go)
+  if (!dragged && performance.now() - downAt < 350){
+    const i = pickBody(e.clientX*DPR, e.clientY*DPR);
+    if (i >= 0){ followId = P.id[i]; followIdx = i; }
+    else stopFollow();
+  }
+});
+cv.addEventListener('pointercancel', e => { pointers.delete(e.pointerId); pinchDist = 0; });
+cv.addEventListener('wheel', e => {
+  e.preventDefault();
+  zoomAt(e.clientX*DPR, e.clientY*DPR, Math.pow(1.0015, -e.deltaY));
 }, { passive: false });
 cv.addEventListener('dblclick', e => {
   const wx = (e.clientX*DPR - W*0.5)/cam.z + cam.x;
@@ -64,7 +127,7 @@ cv.addEventListener('dblclick', e => {
   SIM.spawnNebula(wx, wy, 420, 150);
 });
 cv.addEventListener('contextmenu', e => e.preventDefault());
-function recenter(){ cam.x = 0; cam.y = 0; cam.z = 0.34; camMoved = true; }
+function recenter(){ stopFollow(); cam.x = 0; cam.y = 0; cam.z = 0.34; camMoved = true; }
 
 // ---- glow sprites (cached radial gradients — the fast path for 10k glows) ----
 function makeSprite(core, halo, sharp){
@@ -290,6 +353,15 @@ function draw(){
 
   drawFx();
 
+  // a soft reticle around whoever the camera is riding with
+  if (followId && followIdx >= 0){
+    const fr = (10 + Math.sqrt(P.m[followIdx])) * Math.max(0.5, z) * DPR + 6*DPR;
+    ctx.globalAlpha = 0.35 + 0.15*Math.sin(performance.now()*0.004);
+    ctx.strokeStyle = '#ffd9a0'; ctx.lineWidth = DPR;
+    ctx.beginPath(); ctx.arc(sx(P.x[followIdx]), sy(P.y[followIdx]), fr, 0, 6.2832); ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
   // labels for the celebrities (only when reasonably zoomed in)
   if (S.labels && z > 0.3){
     ctx.globalCompositeOperation = 'source-over';
@@ -325,6 +397,7 @@ function frame(t){
     el.style.color = fps >= 50 ? '#7df3b0' : fps >= 30 ? '#ffd166' : '#ff5d73';
   }
   SIM.update();
+  applyFollow();
   drainEvents();
   draw();
   requestAnimationFrame(frame);

@@ -36,8 +36,10 @@ const P = {
   type: new Uint8Array(MAX),
   hue: new Float32Array(MAX),   // gas tint / NS spin phase / BH feed timer
   spin: new Float32Array(MAX),  // NS sweep speed
+  id: new Uint32Array(MAX),     // stable identity (survives swap-with-last)
 };
 let N = 0;          // alive count (alive particles are always 0..N-1)
+let nextId = 1;
 let era = 0;        // cosmic clock, "Myr"
 
 const events = [];  // {t:'birth'|'sn'|'giant'|'wd'|'eat'|'bhborn', x,y,m} — drained by render
@@ -50,6 +52,7 @@ function addP(x, y, vx, vy, m, type){
   P.life[i] = type === STAR ? lifeOf(m) : 1e9;
   P.hue[i] = Math.random() * 360;
   P.spin[i] = 0;
+  P.id[i] = nextId++;
   return i;
 }
 function killP(i){          // swap-with-last
@@ -58,6 +61,7 @@ function killP(i){          // swap-with-last
     P.x[i]=P.x[N]; P.y[i]=P.y[N]; P.vx[i]=P.vx[N]; P.vy[i]=P.vy[N];
     P.m[i]=P.m[N]; P.age[i]=P.age[N]; P.life[i]=P.life[N];
     P.type[i]=P.type[N]; P.hue[i]=P.hue[N]; P.spin[i]=P.spin[N];
+    P.id[i]=P.id[N];
   }
 }
 

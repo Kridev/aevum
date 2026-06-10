@@ -49,6 +49,20 @@ const bPause = $('bPause');
 bPause.onclick = () => { S.paused = !S.paused; bPause.classList.toggle('active', S.paused); bPause.textContent = S.paused ? 'Resume' : 'Pause'; };
 $('bHome').onclick = () => SIM.recenter();
 
+// ---- 📺 Auto: hands-free planetarium — reseeds the void every so often ----
+let autoOn = false, autoTimer = null;
+const bAuto = $('bAuto');
+function autoStep(){
+  const names = Object.keys(SCENES);
+  runScene(names[(Math.random()*names.length)|0]);
+}
+bAuto.onclick = () => {
+  autoOn = !autoOn;
+  bAuto.classList.toggle('active', autoOn);
+  clearInterval(autoTimer);
+  if (autoOn){ autoStep(); autoTimer = setInterval(autoStep, 45000); }
+};
+
 // ---- HUD census ----
 setInterval(() => {
   const n = SIM.N;
@@ -103,6 +117,7 @@ addEventListener('keydown', e => {
     case 'g': bGlow.click(); break;
     case 't': bTrails.click(); break;
     case 'l': bLabels.click(); break;
+    case 'a': bAuto.click(); break;
     case 'b': runScene('bigbang'); break;
     case 'h': panelHidden = !panelHidden; hidePanel(panelHidden); break;
     case 'f': $('bFull').click(); break;

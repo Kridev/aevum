@@ -52,6 +52,11 @@ const bPause = $('bPause');
 bPause.onclick = () => { S.paused = !S.paused; bPause.classList.toggle('active', S.paused); bPause.textContent = S.paused ? 'Resume' : 'Pause'; };
 $('bHome').onclick = () => SIM.recenter();
 
+// ---- zoom controls (buttons + keys ease toward the target, centred) ----
+$('bZoomIn').onclick  = () => SIM.zoomBy(1.5);
+$('bZoomOut').onclick = () => SIM.zoomBy(1/1.5);
+$('bZoomHome').onclick = () => SIM.recenter();
+
 // ---- 📺 Auto: hands-free planetarium — reseeds the void every so often ----
 let autoOn = false, autoTimer = null;
 const bAuto = $('bAuto');
@@ -129,6 +134,8 @@ addEventListener('keydown', e => {
     case 'h': panelHidden = !panelHidden; hidePanel(panelHidden); break;
     case 'f': $('bFull').click(); break;
     case '0': SIM.recenter(); break;
+    case '+': case '=': SIM.zoomBy(1.5); break;
+    case '-': case '_': SIM.zoomBy(1/1.5); break;
     case '?': $('helpBtn').click(); break;
     case 'escape': $('help').classList.remove('show'); break;
     case '1': runScene('spiral'); break;

@@ -74,6 +74,19 @@ function zoomAt(mx, my, f){
   camMoved = true;
 }
 
+// smooth zoom: inputs set a target; each frame eases toward it, anchored on
+// the cursor — wheel notches glide instead of jumping
+let zTarget = cam.z, anchorX = -1, anchorY = -1;
+function requestZoom(mx, my, f){
+  zTarget = Math.min(8, Math.max(0.05, zTarget * f));
+  anchorX = mx; anchorY = my;
+}
+function easeZoom(){
+  if (Math.abs(zTarget - cam.z) < 0.002*cam.z){ return; }
+  const nz = cam.z + (zTarget - cam.z) * 0.22;
+  zoomAt(anchorX < 0 ? W*0.5 : anchorX, anchorY < 0 ? H*0.5 : anchorY, nz/cam.z);
+}
+
 const pointers = new Map();   // active pointers, for drag + pinch
 let pinchDist = 0, downX = 0, downY = 0, downAt = 0, dragged = false;
 cv.addEventListener('pointerdown', e => {
@@ -94,6 +107,7 @@ cv.addEventListener('pointermove', e => {
     const d = Math.hypot(a.x-b.x, a.y-b.y);
     if (pinchDist > 0 && d > 0){
       zoomAt((a.x+b.x)*0.5*DPR, (a.y+b.y)*0.5*DPR, d/pinchDist);
+      zTarget = cam.z;   // pinch is direct manipulation — don't ease-fight it
       stopFollow();
     }
     pinchDist = d; dragged = true;
@@ -122,7 +136,8 @@ addEventListener('pointerup', e => {
 cv.addEventListener('pointercancel', e => { pointers.delete(e.pointerId); pinchDist = 0; });
 cv.addEventListener('wheel', e => {
   e.preventDefault();
-  zoomAt(e.clientX*DPR, e.clientY*DPR, Math.pow(1.0015, -e.deltaY));
+  const dy = e.deltaMode === 1 ? e.deltaY*33 : e.deltaY;   // line-mode wheels (Firefox)
+  requestZoom(e.clientX*DPR, e.clientY*DPR, Math.pow(1.0017, -dy));
 }, { passive: false });
 cv.addEventListener('dblclick', e => {
   const wx = (e.clientX*DPR - W*0.5)/cam.z + cam.x;
@@ -130,7 +145,7 @@ cv.addEventListener('dblclick', e => {
   SIM.spawnNebula(wx, wy, 420, 150);
 });
 cv.addEventListener('contextmenu', e => e.preventDefault());
-function recenter(){ stopFollow(); cam.x = 0; cam.y = 0; cam.z = 0.34; camMoved = true; }
+function recenter(){ stopFollow(); cam.x = 0; cam.y = 0; cam.z = 0.34; zTarget = 0.34; anchorX = anchorY = -1; camMoved = true; }
 
 // ---- glow sprites (cached radial gradients — the fast path for 10k glows) ----
 function makeSprite(core, halo, sharp){
@@ -570,6 +585,8 @@ function draw(){
 
 // ---- main loop + fps ----
 let last = performance.now(), fpsT = 0, fpsN = 0, fps = 0;
+let lastZoomTxt = '';
+const vZoom = document.getElementById('vZoom');
 function frame(t){
   const dt = t - last; last = t;
   fpsT += dt; fpsN++;
@@ -580,14 +597,19 @@ function frame(t){
     el.style.color = fps >= 50 ? '#7df3b0' : fps >= 30 ? '#ffd166' : '#ff5d73';
   }
   SIM.update();
+  easeZoom();
   applyFollow();
   drainEvents();
   draw();
+  // live zoom readout
+  const zTxt = (cam.z >= 1 ? cam.z.toFixed(1) : cam.z.toFixed(2)) + '×';
+  if (zTxt !== lastZoomTxt){ lastZoomTxt = zTxt; vZoom.textContent = zTxt; }
   requestAnimationFrame(frame);
 }
 
 SIM.cam = cam;
 SIM.recenter = recenter;
+SIM.zoomBy = f => requestZoom(W*0.5, H*0.5, f);   // keyboard / button zoom, centred
 SIM.fpsNow = () => fps;
 
 // ---- boot: a spiral galaxy, unless a shared link will restore state (tools.js) ----

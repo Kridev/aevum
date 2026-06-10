@@ -50,7 +50,7 @@ sun-like star lives minutes, not aeons, and the scales are artistic license.
 | **Seeds** | 🌀 Spiral (sometimes barred, with dust lanes) · 🌌 Elliptical · 💫 Collision (two galaxies meet) · ☁️ Nebula · ✨ Cluster · 🪐 Binary (two black holes inspiral and merge) · 💍 Ring (a Hoag-type ring galaxy) · 🕸️ Group (five dwarf galaxies waltz, strip and merge) |
 | **💥 Big Bang** | primordial gas with seeded density fluctuations — watch a little cosmic web condense, then light up |
 | **View** | ✨ Glow · ☄️ Trails · 🏷️ Labels (names the quasars, pulsars and giants) |
-| **Camera** | drag to pan, scroll or pinch to zoom — from cosmic web down to a single accretion disk; click any star, pulsar or black hole to **ride along with it**; `0` recenters |
+| **Camera** | drag to pan; scroll, pinch, `+`/`−` or the corner buttons to zoom (eased, anchored on the cursor) — from cosmic web down to a single accretion disk; click any star, pulsar or black hole to **ride along with it**; `0` recenters; the HUD shows the current magnification |
 | **📺 Auto** | hands-free planetarium: reseeds the void with a fresh scene every 45 s |
 | **Sound of space** | all synthesized live: 🌑 a sub-bass drone · 🎹 a slow original pad · ✨ chimes when stars ignite · 📡 events — supernovae boom, black holes growl, pulsars tick, mergers chirp |
 | **📷 PNG / 🎬 Record** | export a still or capture a WebM clip |
@@ -63,7 +63,7 @@ clock in Myr.
 ### Keyboard
 
 `Space` pause · `1–8` seeds · `B` big bang · `A` auto · `G` glow · `T` trails ·
-`L` labels · `0` recenter · `F` fullscreen · `H` panel · `?` help
+`L` labels · `+`/`−` zoom · `0` recenter · `F` fullscreen · `H` panel · `?` help
 
 Append **`?nointro`** to the URL to skip the title card.
 

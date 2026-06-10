@@ -25,7 +25,7 @@ const GAS_M = 0.16;         // mass of one gas wisp
 const WORLD_R = 2600;       // beyond this, a gentle pull back toward the centre
 
 // particle types
-const GAS = 0, STAR = 1, GIANT = 2, WD = 3, NS = 4, BH = 5;
+const GAS = 0, STAR = 1, GIANT = 2, WD = 3, NS = 4, BH = 5, BD = 6, MAGNETAR = 7;
 
 // struct-of-arrays
 const P = {
@@ -51,7 +51,10 @@ function addP(x, y, vx, vy, m, type){
   P.m[i] = m; P.type[i] = type; P.age[i] = 0;
   P.life[i] = type === STAR ? lifeOf(m) : 1e9;
   P.hue[i] = Math.random() * 360;
+  // spin doubles as: gas → dust flag (dark nebula wisp), star → Cepheid pulse rate
   P.spin[i] = 0;
+  if (type === GAS && Math.random() < 0.22) P.spin[i] = 1;
+  if (type === STAR && m > 2.5 && m < 9 && Math.random() < 0.25) P.spin[i] = 0.5 + Math.random();
   P.id[i] = nextId++;
   return i;
 }
@@ -182,11 +185,17 @@ function formStars(){
     }
     // a dense knot keeps accreting while it collapses, so crowded cells can
     // build true giants — only the richest cores ever exceed the SN threshold
-    const m = Math.max(0.25, Math.min(want, mm*2.2));
-    const j = addP(mx/mm, my/mm, mvx/mm, mvy/mm, m, STAR);
-    if (j >= 0){
-      P.age[j] = 0; P.life[j] = lifeOf(m);
-      events.push({ t:'birth', x:mx/mm, y:my/mm, m });
+    let m = Math.max(0.16, Math.min(want, mm*2.2));
+    if (Math.random() < 0.1) m = 0.16 + Math.random()*0.07;   // fizzled collapse → brown dwarf
+    if (m < 0.24){
+      // not enough to ignite: a brown dwarf smoulders instead
+      addP(mx/mm, my/mm, mvx/mm, mvy/mm, m, BD);
+    } else {
+      const j = addP(mx/mm, my/mm, mvx/mm, mvy/mm, m, STAR);
+      if (j >= 0){
+        P.age[j] = 0; P.life[j] = lifeOf(m);
+        events.push({ t:'birth', x:mx/mm, y:my/mm, m });
+      }
     }
   }
   // remove consumed gas, highest index first so swaps don't invalidate
@@ -199,12 +208,18 @@ function evolve(dt){
   era += dt * 0.05;
   for (let i=0;i<N;i++){
     const t = P.type[i];
-    if (t === GAS || t === WD || t === BH){
+    if (t === GAS || t === WD || t === BH || t === BD){
       if (t === BH && P.hue[i] > 0) P.hue[i] -= dt;          // accretion glow cools
       if (t === WD) P.age[i] += dt;
       continue;
     }
-    if (t === NS){ P.hue[i] += P.spin[i]*dt; continue; }      // pulsar sweep phase
+    if (t === NS || t === MAGNETAR){                          // pulsar sweep phase
+      P.hue[i] += P.spin[i]*dt; P.age[i] += dt;
+      // magnetars throw violent magnetic flares now and then
+      if (t === MAGNETAR && Math.random() < 0.0011*dt)
+        events.push({ t:'flare', x:P.x[i], y:P.y[i], m:P.m[i] });
+      continue;
+    }
     P.age[i] += dt;
     if (t === STAR && P.m[i] >= 0.55 && P.m[i] < 8 && P.age[i] > 0.82*P.life[i]){
       P.type[i] = GIANT;
@@ -251,13 +266,18 @@ function supernova(i){
     const a=Math.random()*6.2832, v=1.4+Math.random()*2.4;
     addP(x+Math.cos(a)*4, y+Math.sin(a)*4, P.vx[i]+Math.cos(a)*v, P.vy[i]+Math.sin(a)*v, GAS_M, GAS);
   }
-  // the core collapses: monster → black hole, otherwise a sweeping pulsar
+  // the core collapses: monster → black hole (announced by a gamma-ray burst),
+  // otherwise a sweeping pulsar — and sometimes a flaring magnetar
   if (m >= 16){
     P.type[i]=BH; P.m[i]=m*0.45; P.hue[i]=40; P.age[i]=0; P.life[i]=1e9;
+    events.push({ t:'grb', x, y, m, a:Math.random()*Math.PI });
     events.push({ t:'bhborn', x, y, m:P.m[i] });
   } else {
-    P.type[i]=NS; P.m[i]=1.5; P.age[i]=0; P.life[i]=1e9;
-    P.hue[i]=Math.random()*6.2832; P.spin[i]=0.05+Math.random()*0.12;
+    const mag = Math.random() < 0.22;
+    P.type[i] = mag ? MAGNETAR : NS;
+    P.m[i]=mag?2.1:1.5; P.age[i]=0; P.life[i]=1e9;
+    P.hue[i]=Math.random()*6.2832;
+    P.spin[i]=mag ? 0.16+Math.random()*0.2 : 0.05+Math.random()*0.12;
   }
 }
 
@@ -293,7 +313,7 @@ function feedBlackHoles(dt){
 const compact = [];
 function mergeCompact(){
   compact.length = 0;
-  for (let i=0;i<N;i++) if (P.type[i]===NS || P.type[i]===BH) compact.push(i);
+  for (let i=0;i<N;i++) if (P.type[i]===NS || P.type[i]===MAGNETAR || P.type[i]===BH) compact.push(i);
   if (compact.length < 2) return;
   for (let a=0;a<compact.length;a++){
     for (let b=a+1;b<compact.length;b++){
@@ -305,7 +325,7 @@ function mergeCompact(){
       if (dx*dx+dy*dy > rr*rr) continue;
       const mm = P.m[i]+P.m[j];
       const vx=(P.vx[i]*P.m[i]+P.vx[j]*P.m[j])/mm, vy=(P.vy[i]*P.m[i]+P.vy[j]*P.m[j])/mm;
-      if (ti===NS && tj===NS){
+      if (ti!==BH && tj!==BH){
         events.push({ t:'kilonova', x:P.x[i], y:P.y[i], m:mm });
         puffGas(i, 10, 2.2);                       // a spray of freshly-forged heavy elements
         P.type[i]=BH; P.m[i]=mm; P.hue[i]=120;     // most NS-NS pairs tip into a black hole
@@ -317,7 +337,27 @@ function mergeCompact(){
       P.m[j]=0;   // mark; reaped below
     }
   }
-  for (let i=N-1;i>=0;i--) if (P.m[i]===0 && (P.type[i]===NS||P.type[i]===BH)) killP(i);
+  for (let i=N-1;i>=0;i--) if (P.m[i]===0 && (P.type[i]===NS||P.type[i]===MAGNETAR||P.type[i]===BH)) killP(i);
+}
+
+// ---- novae: a white dwarf siphoning a swollen neighbour erupts now and then ----
+const wdIdx = [], giIdx = [];
+function novae(){
+  wdIdx.length = 0; giIdx.length = 0;
+  for (let i=0;i<N;i++){
+    if (P.type[i]===WD) wdIdx.push(i);
+    else if (P.type[i]===GIANT) giIdx.push(i);
+  }
+  if (!wdIdx.length || !giIdx.length || wdIdx.length*giIdx.length > 250000) return;
+  for (const i of wdIdx){
+    for (const j of giIdx){
+      const dx=P.x[j]-P.x[i], dy=P.y[j]-P.y[i];
+      if (dx*dx+dy*dy < 18*18 && Math.random() < 0.05){
+        events.push({ t:'nova', x:P.x[i], y:P.y[i], m:P.m[i] });
+        break;
+      }
+    }
+  }
 }
 
 // ---- physics step ----
@@ -347,7 +387,7 @@ function update(){
   const dt = Math.min(2, S.timeScale);
   const sub = S.timeScale > 2 ? 2 : 1;
   for (let k=0;k<sub;k++) step(S.timeScale/sub);
-  if (++formTick >= 3){ formTick = 0; formStars(); }
+  if (++formTick >= 3){ formTick = 0; formStars(); novae(); }
 }
 
 // ---- spawners ----
@@ -355,20 +395,31 @@ function clearAll(){ N = 0; era = 0; events.length = 0; }
 
 function circVel(r, Menc){ return Math.sqrt(G0*S.gravity*Math.max(1,Menc)/Math.max(8,r)); }
 
-function spawnSpiral(cx, cy, count, R, dir, vx0, vy0){
+function spawnSpiral(cx, cy, count, R, dir, vx0, vy0, smbhScale){
   vx0 = vx0||0; vy0 = vy0||0;
-  const smbhM = 3800;
+  const smbhM = 3800 * (smbhScale||1);
   const bh = addP(cx, cy, vx0, vy0, smbhM, BH);
   if (bh>=0){ P.hue[bh]=30; }
   const diskM = count * 0.5;
+  // half of all spirals grow a central bar (like the Milky Way's)
+  const barred = Math.random() < 0.5;
+  const barA = Math.random()*Math.PI, barL = R*0.3;
   for (let k=0;k<count && N<MAX;k++){
     // exponential-ish disk with two seeded arms
     let r = R*0.06 + (-Math.log(1-Math.random()*0.94))*R*0.3;
     if (r>R) r = R*Math.random();
     let th;
-    if (Math.random()<0.68 && r > R*0.16){
-      const arm = Math.random()<0.5 ? 0 : Math.PI;
-      th = arm + r*0.0145*dir + (Math.random()-0.5)*0.55;   // log-spiral wind
+    if (barred && r < barL && Math.random()<0.7){
+      // the bar: stars strung along a rotating spindle through the nucleus
+      const s = (Math.random()*2-1);
+      const w = (Math.random()-0.5)*barL*0.22;
+      const x = cx + Math.cos(barA)*s*barL - Math.sin(barA)*w;
+      const y = cy + Math.sin(barA)*s*barL + Math.cos(barA)*w;
+      r = Math.max(8, Math.hypot(x-cx, y-cy)); th = Math.atan2(y-cy, x-cx);
+    } else if (Math.random()<0.68 && r > R*0.16){
+      // arms anchored to the bar's ends (or, unbarred, to the nucleus)
+      const arm = (Math.random()<0.5 ? 0 : Math.PI) + (barred ? barA : 0);
+      th = arm + (barred ? (r-barL) : r)*0.0145*dir + (Math.random()-0.5)*0.55;
     } else th = Math.random()*6.2832;
     const x = cx + Math.cos(th)*r, y = cy + Math.sin(th)*r;
     const Menc = smbhM + diskM*Math.pow(r/R, 1.4);
@@ -381,6 +432,62 @@ function spawnSpiral(cx, cy, count, R, dir, vx0, vy0){
       const i = addP(x, y, vx0+tx*v, vy0+ty*v, m, STAR);
       if (i>=0) P.age[i] = Math.random()*0.75*P.life[i];   // mixed-age population
     }
+  }
+}
+function spawnRing(cx, cy){
+  // a Hoag-type ring galaxy: an old yellow core inside a detached blue ring
+  const coreM = 2400;
+  const bh = addP(cx, cy, 0, 0, coreM, BH); if (bh>=0) P.hue[bh]=20;
+  for (let k=0;k<750 && N<MAX;k++){
+    const r=20+90*Math.pow(Math.random(),0.6), th=Math.random()*6.2832;
+    const v=circVel(r, coreM)*0.55, va=Math.random()*6.2832;
+    const m=Math.min(2.6, imf());
+    const i=addP(cx+Math.cos(th)*r, cy+Math.sin(th)*r, Math.cos(va)*v, Math.sin(va)*v, m, STAR);
+    if (i>=0) P.age[i]=(0.3+Math.random()*0.5)*P.life[i];
+  }
+  const ringR = 480, ringM = coreM + 420;
+  for (let k=0;k<2600 && N<MAX;k++){
+    const r=ringR + (Math.random()-0.5)*80, th=Math.random()*6.2832;
+    const v=circVel(r, ringM + 1300*0.5)*(0.97+Math.random()*0.06);
+    const x=cx+Math.cos(th)*r, y=cy+Math.sin(th)*r;
+    if (Math.random()<0.6) addP(x, y, -Math.sin(th)*v, Math.cos(th)*v, GAS_M, GAS);
+    else {
+      const i=addP(x, y, -Math.sin(th)*v, Math.cos(th)*v, imf(), STAR);
+      if (i>=0) P.age[i]=Math.random()*0.4*P.life[i];   // the ring is young and blue
+    }
+  }
+}
+function spawnGroup(){
+  // a little galaxy group: dwarfs waltzing around their common centre —
+  // give it time and they strip, distort and merge into one
+  clearAll();
+  const n = 5, orbitR = 950;
+  const totalM = n * 2200;
+  for (let g=0; g<n; g++){
+    const a = g*6.2832/n + Math.random()*0.5;
+    const r = orbitR*(0.75+Math.random()*0.5);
+    const x = Math.cos(a)*r, y = Math.sin(a)*r;
+    const v = circVel(r, totalM*0.55)*(0.85+Math.random()*0.2);
+    const vx = -Math.sin(a)*v, vy = Math.cos(a)*v;
+    if (Math.random()<0.6) spawnSpiral(x, y, 950, 300, Math.random()<0.5?1:-1, vx, vy, 0.42);
+    else {
+      // dwarf elliptical: same recipe as the big one, just smaller
+      const coreM = 1100;
+      const bh = addP(x, y, vx, vy, coreM, BH); if (bh>=0) P.hue[bh]=10;
+      for (let k=0;k<800 && N<MAX;k++){
+        const rr=260*Math.pow(Math.random(),0.62), th=Math.random()*6.2832;
+        const sig=circVel(rr, coreM+800*0.4*Math.pow(rr/260,1.2))*0.75;
+        const va=Math.random()*6.2832, vv=sig*(0.5+Math.random());
+        const i=addP(x+Math.cos(th)*rr, y+Math.sin(th)*rr, vx+Math.cos(va)*vv, vy+Math.sin(va)*vv, Math.min(1.6,imf()), STAR);
+        if (i>=0) P.age[i]=(0.3+Math.random()*0.55)*P.life[i];
+      }
+    }
+  }
+  // thin intracluster gas threading the group
+  for (let k=0;k<900 && N<MAX;k++){
+    const r=1400*Math.sqrt(Math.random()), th=Math.random()*6.2832;
+    const v=circVel(r, totalM*0.4)*0.7;
+    addP(Math.cos(th)*r, Math.sin(th)*r, -Math.sin(th)*v, Math.cos(th)*v, GAS_M, GAS);
   }
 }
 function spawnElliptical(cx, cy, count, R){
@@ -471,8 +578,9 @@ function bigBang(){
 window.SIDEREUM = {
   S, P, events,
   get N(){ return N; }, get era(){ return era; },
-  GAS, STAR, GIANT, WD, NS, BH,
+  GAS, STAR, GIANT, WD, NS, BH, BD, MAGNETAR,
   update, clearAll, addP,
-  spawnSpiral, spawnElliptical, spawnNebula, spawnCluster, spawnBinary, spawnCollision, bigBang,
+  spawnSpiral, spawnElliptical, spawnNebula, spawnCluster, spawnBinary, spawnCollision,
+  spawnRing, spawnGroup, bigBang,
 };
 })();

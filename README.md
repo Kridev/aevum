@@ -15,6 +15,15 @@ white dwarfs. Neutron stars collide in golden **kilonovae**; black holes merge
 and the speakers ring with a gravitational-wave chirp. Nothing is
 choreographed — it's one gravity rule plus a stellar life cycle.
 
+The bestiary runs deeper: failed collapses smoulder as **brown dwarfs**,
+**Cepheid variables** pulse on a steady beat, the most monstrous stars blaze as
+**Wolf-Rayets**, a fifth of dead cores spin up into flaring **magnetars**
+wrapped in **pulsar wind nebulae**, black-hole births stab the sky with
+**gamma-ray bursts**, and white dwarfs siphoning a swollen neighbour erupt in
+**novae**. Dusty gas forms **dark nebulae** that carve lanes through the glow.
+Zoom in past 2× and stars resolve into little **planetary systems**. Turn on
+🏷️ Labels and the sim names its own celebrities.
+
 ## How it works
 
 Every dot is matter with a mass and a velocity. Gravity is computed with a
@@ -33,7 +42,7 @@ sun-like star lives minutes, not aeons, and the scales are artistic license.
 | | |
 |---|---|
 | **Sliders** | time flow, gravity strength, star-formation rate |
-| **Seeds** | 🌀 Spiral · 🌌 Elliptical · 💫 Collision (two galaxies meet) · ☁️ Nebula · ✨ Cluster · 🪐 Binary (two black holes inspiral and merge) |
+| **Seeds** | 🌀 Spiral (sometimes barred, with dust lanes) · 🌌 Elliptical · 💫 Collision (two galaxies meet) · ☁️ Nebula · ✨ Cluster · 🪐 Binary (two black holes inspiral and merge) · 💍 Ring (a Hoag-type ring galaxy) · 🕸️ Group (five dwarf galaxies waltz, strip and merge) |
 | **💥 Big Bang** | primordial gas with seeded density fluctuations — watch a little cosmic web condense, then light up |
 | **View** | ✨ Glow · ☄️ Trails · 🏷️ Labels (names the quasars, pulsars and giants) |
 | **Camera** | drag to pan, scroll or pinch to zoom — from cosmic web down to a single accretion disk; click any star, pulsar or black hole to **ride along with it**; `0` recenters |
@@ -48,7 +57,7 @@ clock in Myr.
 
 ### Keyboard
 
-`Space` pause · `1–6` seeds · `B` big bang · `A` auto · `G` glow · `T` trails ·
+`Space` pause · `1–8` seeds · `B` big bang · `A` auto · `G` glow · `T` trails ·
 `L` labels · `0` recenter · `F` fullscreen · `H` panel · `?` help
 
 Append **`?nointro`** to the URL to skip the title card.

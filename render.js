@@ -3,7 +3,7 @@
 (() => {
 'use strict';
 const SIM = window.SIDEREUM;
-const { S, P, events, GAS, STAR, GIANT, WD, NS, BH } = SIM;
+const { S, P, events, GAS, STAR, GIANT, WD, NS, BH, BD, MAGNETAR } = SIM;
 
 const cv = document.getElementById('stage');
 const ctx = cv.getContext('2d', { alpha: false });
@@ -57,7 +57,7 @@ function pickBody(mx, my){
     const dx=P.x[i]-wx, dy=P.y[i]-wy, d2=dx*dx+dy*dy;
     if (d2 > r2) continue;
     const t = P.type[i];
-    const score = (t===BH?4e6 : t===NS?3e6 : t===GIANT?2e6 : 1e6) + P.m[i]*1e3 - d2;
+    const score = (t===BH?4e6 : (t===NS||t===MAGNETAR)?3e6 : t===GIANT?2e6 : 1e6) + P.m[i]*1e3 - d2;
     if (score > bestScore){ bestScore = score; best = i; }
   }
   return best;
@@ -156,6 +156,20 @@ const giantSpr  = makeSprite('rgba(255,170,120,1)', 'rgba(255,70,40,0.5)');
 const wdSpr     = makeSprite('rgba(235,245,255,1)', 'rgba(160,200,255,0.45)', true);
 const nsSpr     = makeSprite('rgba(255,255,255,1)', 'rgba(190,225,255,0.6)', true);
 const accSpr    = makeSprite('rgba(255,225,170,0.9)', 'rgba(255,140,50,0.5)');
+const bdSpr     = makeSprite('rgba(190,110,90,0.9)', 'rgba(120,50,40,0.4)', true);    // brown dwarf ember
+const wrSpr     = makeSprite('rgba(255,255,255,1)', 'rgba(200,170,255,0.65)');        // Wolf-Rayet fury
+const magSpr    = makeSprite('rgba(235,255,255,1)', 'rgba(120,235,255,0.65)', true);  // magnetar
+const pwnSpr    = makeSprite('rgba(140,200,255,0.5)', 'rgba(70,110,220,0.22)');       // pulsar wind nebula
+const dustSpr   = (() => {   // dark nebula wisp — drawn opaque-ish, occludes the glow
+  const s = 64, c = document.createElement('canvas'); c.width = c.height = s;
+  const g = c.getContext('2d');
+  const grad = g.createRadialGradient(s/2, s/2, 0, s/2, s/2, s/2);
+  grad.addColorStop(0, 'rgba(6,5,10,0.85)');
+  grad.addColorStop(0.55, 'rgba(8,6,14,0.4)');
+  grad.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = grad; g.fillRect(0, 0, s, s);
+  return c;
+})();
 // gas wisps in a few nebula tints, picked per-particle by P.hue
 const GAS_SPRS = [
   makeSprite('rgba(130,170,255,0.85)', 'rgba(60,90,200,0.4)'),
@@ -193,6 +207,9 @@ function drainEvents(){
     else if (e.t === 'bhborn')fx.push({ k:'bh',   x:e.x, y:e.y, age:0, max:70, m:e.m });
     else if (e.t === 'kilonova') fx.push({ k:'kn', x:e.x, y:e.y, age:0, max:110, m:e.m });
     else if (e.t === 'bhmerge')  fx.push({ k:'gw', x:e.x, y:e.y, age:0, max:80,  m:e.m });
+    else if (e.t === 'grb')   fx.push({ k:'grb',  x:e.x, y:e.y, age:0, max:46, m:e.m, a:e.a });
+    else if (e.t === 'nova')  fx.push({ k:'nova', x:e.x, y:e.y, age:0, max:34, m:e.m });
+    else if (e.t === 'flare') fx.push({ k:'flare',x:e.x, y:e.y, age:0, max:24, m:e.m });
   }
   events.length = 0;
   if (fx.length > 140) fx.splice(0, fx.length - 140);
@@ -243,6 +260,28 @@ function drawFx(){
         ctx.globalAlpha = 0.5 * (1-tt);
         ctx.beginPath(); ctx.arc(x, y, 220*tt*cam.z + 2, 0, 6.2832); ctx.stroke();
       }
+    } else if (f.k === 'grb'){
+      // gamma-ray burst: two razor beams stabbing out of the collapse
+      const L = (90 + 600*t) * cam.z;
+      const grad = ctx.createLinearGradient(
+        x - Math.cos(f.a)*L, y - Math.sin(f.a)*L,
+        x + Math.cos(f.a)*L, y + Math.sin(f.a)*L);
+      grad.addColorStop(0, 'rgba(190,255,230,0)');
+      grad.addColorStop(0.5, `rgba(230,255,245,${0.85*(1-t)})`);
+      grad.addColorStop(1, 'rgba(190,255,230,0)');
+      ctx.strokeStyle = grad; ctx.lineWidth = Math.max(1, 1.6*cam.z*DPR*(1-t));
+      ctx.beginPath();
+      ctx.moveTo(x - Math.cos(f.a)*L, y - Math.sin(f.a)*L);
+      ctx.lineTo(x + Math.cos(f.a)*L, y + Math.sin(f.a)*L);
+      ctx.stroke();
+    } else if (f.k === 'nova'){
+      const r = (4 + 26*t) * cam.z + 2;
+      ctx.globalAlpha = 0.8 * (1-t);
+      ctx.drawImage(wdSpr, x-r, y-r, r*2, r*2);
+    } else if (f.k === 'flare'){
+      const r = (6 + 40*t) * cam.z + 2;
+      ctx.globalAlpha = 0.85 * (1-t);
+      ctx.drawImage(magSpr, x-r, y-r, r*2, r*2);
     }
   }
   ctx.globalAlpha = 1;
@@ -273,7 +312,7 @@ function draw(){
   gctx.globalAlpha = Math.min(0.5, 0.3 + 0.07/z);
   const gasR = Math.max(4, 10*z) * DPR;   // half-res radius — wisps must overlap into nebulae
   for (let i=0;i<N;i++){
-    if (P.type[i] !== GAS) continue;
+    if (P.type[i] !== GAS || P.spin[i] > 0) continue;
     const x = P.x[i]; if (x<x0||x>x1) continue;
     const y = P.y[i]; if (y<y0||y>y1) continue;
     const spr = GAS_SPRS[((P.hue[i]*0.0111)|0) & 3];
@@ -281,6 +320,21 @@ function draw(){
   }
   ctx.drawImage(gasCv, 0, 0, W, H);
 
+  // dark nebulae: dusty wisps drawn over the glow, carving lanes and globules
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.globalAlpha = 0.55;
+  const dustR = Math.max(5, 12*z) * DPR;
+  for (let i=0;i<N;i++){
+    if (P.type[i] !== GAS || P.spin[i] === 0) continue;
+    const x = P.x[i]; if (x<x0||x>x1) continue;
+    const y = P.y[i]; if (y<y0||y>y1) continue;
+    ctx.drawImage(dustSpr, sx(x)-dustR, sy(y)-dustR, dustR*2, dustR*2);
+  }
+  ctx.globalAlpha = 1;
+  if (S.glow) ctx.globalCompositeOperation = 'lighter';
+
+  const eraNow = SIM.era;
+  let systemsDrawn = 0;
   for (let i=0;i<N;i++){
     const t = P.type[i];
     if (t === GAS) continue;
@@ -289,15 +343,43 @@ function draw(){
     const px = sx(x), py = sy(y);
     const m = P.m[i];
     if (t === STAR){
-      const r = Math.max(2.2, (2 + Math.pow(m,0.45)*2.6) * z) * DPR;
-      const spr = starSprite(m);
+      let r = Math.max(2.2, (2 + Math.pow(m,0.45)*2.6) * z) * DPR;
+      // Cepheid variables breathe — brightness swells and dims on a steady beat
+      if (P.spin[i] > 0) r *= 1 + 0.3*Math.sin(eraNow*P.spin[i]*0.8 + P.hue[i]);
+      const wr = m > 24;   // Wolf-Rayet: furious wind, violet sheath
+      const spr = wr ? wrSpr : starSprite(m);
       ctx.drawImage(spr, px-r, py-r, r*2, r*2);
       if (m > 4){   // the big ones get a wider corona — they should dominate the sky
-        const r2 = r*2.1;
+        const r2 = r*(wr ? 2.6 : 2.1);
         ctx.globalAlpha = 0.45;
         ctx.drawImage(spr, px-r2, py-r2, r2*2, r2*2);
         ctx.globalAlpha = 1;
       }
+      // zoom close enough and a star resolves into a little planetary system
+      if (z > 2.2 && systemsDrawn < 150){
+        systemsDrawn++;
+        const h = (P.id[i]*2654435761)>>>0;
+        const np = h % 5;
+        for (let k=0;k<np;k++){
+          const orbR = (4 + k*2.6 + ((h>>(k*3))&3)) * z * DPR;
+          const sp = 0.5/Math.pow(4+k*2.6, 0.8);
+          const a = eraNow*sp + ((h>>(k*5))&31);
+          const ppx = px + Math.cos(a)*orbR, ppy = py + Math.sin(a)*orbR;
+          ctx.globalAlpha = 0.25;
+          ctx.strokeStyle = '#8893b8'; ctx.lineWidth = 0.5*DPR;
+          ctx.beginPath(); ctx.arc(px, py, orbR, 0, 6.2832); ctx.stroke();
+          ctx.globalAlpha = 0.9;
+          ctx.fillStyle = ['#9db9ff','#d8b88a','#8fd8c0','#c5cbe8'][k&3];
+          ctx.beginPath(); ctx.arc(ppx, ppy, Math.max(1, 0.5*z)*DPR, 0, 6.2832); ctx.fill();
+          ctx.globalAlpha = 1;
+        }
+      }
+    } else if (t === BD){
+      // a failed star: barely an ember
+      const r = Math.max(1.2, 1.6*z) * DPR;
+      ctx.globalAlpha = 0.8;
+      ctx.drawImage(bdSpr, px-r, py-r, r*2, r*2);
+      ctx.globalAlpha = 1;
     } else if (t === GIANT){
       const r = Math.max(1.6, (3 + Math.pow(m,0.45)*3.6) * z) * DPR;
       // giants smoulder — slow breathing pulse
@@ -309,13 +391,22 @@ function draw(){
       ctx.globalAlpha = fade;
       ctx.drawImage(wdSpr, px-r, py-r, r*2, r*2);
       ctx.globalAlpha = 1;
-    } else if (t === NS){
-      const r = Math.max(1, 2*z) * DPR;
-      ctx.drawImage(nsSpr, px-r, py-r, r*2, r*2);
+    } else if (t === NS || t === MAGNETAR){
+      const mag = t === MAGNETAR;
+      const r = Math.max(1, (mag?3:2)*z) * DPR;
+      // young remnants still wear their pulsar wind nebula
+      if (P.age[i] < 2600){
+        const nr = 14*z*DPR * (0.6 + 0.4*(1 - P.age[i]/2600));
+        ctx.globalAlpha = 0.35 * (1 - P.age[i]/2600);
+        ctx.drawImage(pwnSpr, px-nr, py-nr, nr*2, nr*2);
+        ctx.globalAlpha = 1;
+      }
+      ctx.drawImage(mag ? magSpr : nsSpr, px-r, py-r, r*2, r*2);
       // the lighthouse: two opposed beams sweeping with the spin phase
-      const a = P.hue[i], L = (26 + 10*Math.sin(a*3)) * z * DPR;
-      ctx.globalAlpha = 0.5;
-      ctx.strokeStyle = '#cfe8ff'; ctx.lineWidth = Math.max(0.6, 0.9*z*DPR);
+      const a = P.hue[i], L = ((mag?40:26) + 10*Math.sin(a*3)) * z * DPR;
+      ctx.globalAlpha = mag ? 0.65 : 0.5;
+      ctx.strokeStyle = mag ? '#aef2ff' : '#cfe8ff';
+      ctx.lineWidth = Math.max(0.6, (mag?1.4:0.9)*z*DPR);
       ctx.beginPath();
       ctx.moveTo(px - Math.cos(a)*L, py - Math.sin(a)*L);
       ctx.lineTo(px + Math.cos(a)*L, py + Math.sin(a)*L);
@@ -370,12 +461,17 @@ function draw(){
     let shown = 0;
     for (let i=0;i<N && shown<24;i++){
       const t = P.type[i];
-      if (t !== BH && t !== NS && t !== GIANT) continue;
+      let name = null;
+      if (t === BH) name = P.hue[i] > 48 && P.m[i] > 400 ? `quasar · ${P.m[i]|0} M☉` : `black hole · ${P.m[i]|0} M☉`;
+      else if (t === NS) name = 'pulsar';
+      else if (t === MAGNETAR) name = 'magnetar';
+      else if (t === GIANT) name = 'red giant';
+      else if (t === STAR && P.m[i] > 24) name = 'Wolf-Rayet star';
+      else if (t === STAR && P.spin[i] > 0 && z > 1.2) name = 'Cepheid variable';
+      else if (t === BD && z > 1.2) name = 'brown dwarf';
+      if (!name) continue;
       const x = P.x[i]; if (x<x0||x>x1) continue;
       const y = P.y[i]; if (y<y0||y>y1) continue;
-      const name = t===BH
-        ? (P.hue[i] > 48 && P.m[i] > 400 ? `quasar · ${P.m[i]|0} M☉` : `black hole · ${P.m[i]|0} M☉`)
-        : t===NS ? 'pulsar' : 'red giant';
       ctx.fillText(name, sx(x)+8*DPR, sy(y)-6*DPR);
       shown++;
     }

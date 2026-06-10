@@ -26,6 +26,8 @@ const SCENES = {
   nebula:     () => { SIM.clearAll(); SIM.spawnNebula(0, 0, 3800, 620); },
   cluster:    () => { SIM.clearAll(); SIM.spawnCluster(0, 0, 1700, 320); },
   binary:     () => { SIM.clearAll(); SIM.spawnBinary(0, 0); },
+  ring:       () => { SIM.clearAll(); SIM.spawnRing(0, 0); },
+  group:      () => { SIM.spawnGroup(); },
   bigbang:    () => { SIM.bigBang(); },
 };
 function runScene(name){
@@ -35,7 +37,8 @@ function runScene(name){
   SIM.recenter();
 }
 [['pSpiral','spiral'],['pElliptical','elliptical'],['pCollision','collision'],
- ['pNebula','nebula'],['pCluster','cluster'],['pBinary','binary'],['bBang','bigbang']]
+ ['pNebula','nebula'],['pCluster','cluster'],['pBinary','binary'],
+ ['pRing','ring'],['pGroup','group'],['bBang','bigbang']]
   .forEach(([id, name]) => { $(id).onclick = () => runScene(name); });
 
 // ---- view toggles ----
@@ -70,7 +73,7 @@ setInterval(() => {
   for (let i=0;i<n;i++){
     const t = P.type[i];
     if (t === SIM.GAS) gas++;
-    else if (t === SIM.STAR || t === SIM.GIANT) stars++;
+    else if (t === SIM.STAR || t === SIM.GIANT || t === SIM.BD) stars++;
     else if (t === SIM.BH) bh++;
     else remn++;
   }
@@ -99,6 +102,9 @@ SIM.onEvent(e => {
   else if (e.t === 'kilonova') toast('💛 kilonova — neutron stars collide');
   else if (e.t === 'bhmerge') toast('🌀 black holes merge — spacetime rings');
   else if (e.t === 'eat' && e.star) toast('⭐ tidal disruption — a star is devoured');
+  else if (e.t === 'grb') toast('☄️ gamma-ray burst');
+  else if (e.t === 'nova') toast('💡 nova — a white dwarf erupts');
+  else if (e.t === 'flare' && Math.random() < 0.3) toast('⚡ magnetar flare');
   else if (e.t === 'giant' && Math.random() < 0.1) toast('🔴 a sun swells into a red giant');
 });
 
@@ -130,6 +136,8 @@ addEventListener('keydown', e => {
     case '4': runScene('nebula'); break;
     case '5': runScene('cluster'); break;
     case '6': runScene('binary'); break;
+    case '7': runScene('ring'); break;
+    case '8': runScene('group'); break;
   }
 });
 

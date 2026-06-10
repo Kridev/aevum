@@ -179,6 +179,19 @@ function gwChirp(){
   o.start(t); o.stop(t + 1.3);
   subDrop(t + 1.15, 60, 24, 1.2, 0.22);   // the ringdown thud
 }
+// a bright falling sweep — GRBs, novae and magnetar flares at different speeds
+function zap(f0, f1, len, peak){
+  const t = actx.currentTime;
+  const o = actx.createOscillator(); o.type='sine';
+  o.frequency.setValueAtTime(f0, t);
+  o.frequency.exponentialRampToValueAtTime(f1, t+len);
+  const g = actx.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(peak, t+0.015);
+  g.gain.exponentialRampToValueAtTime(0.0001, t+len);
+  o.connect(g); toMix(g);
+  o.start(t); o.stop(t+len+0.05);
+}
 function pulseTick(pan){
   const t = actx.currentTime;
   const o = actx.createOscillator(); o.type='square'; o.frequency.value = 880;
@@ -212,6 +225,9 @@ SIM.onEvent(e => {
   else if (e.t === 'kilonova') kilonova();
   else if (e.t === 'bhmerge') gwChirp();
   else if (e.t === 'bhborn'){ subDrop(actx.currentTime, 90, 24, 2.2, 0.26); }
+  else if (e.t === 'grb') zap(3400, 180, 0.45, 0.1);
+  else if (e.t === 'nova') zap(1500, 700, 0.5, 0.05);
+  else if (e.t === 'flare') zap(2400, 900, 0.22, 0.045);
 });
 
 // ---- update loop: drone breathing + pad scheduling + pulsar ticking ----
@@ -231,7 +247,7 @@ setInterval(() => {
   if (layers.events.on){
     const P = SIM.P, n = SIM.N;
     for (let i=0;i<n;i++){
-      if (P.type[i] !== SIM.NS) continue;
+      if (P.type[i] !== SIM.NS && P.type[i] !== SIM.MAGNETAR) continue;
       const beam = Math.floor(P.hue[i] / Math.PI);
       if (beam !== prevBeam){ prevBeam = beam; pulseTick(screenPan(P.x[i], P.y[i])*0.6); }
       break;

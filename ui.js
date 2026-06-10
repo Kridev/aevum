@@ -104,6 +104,7 @@ SIM.onEvent(e => {
   else if (e.t === 'eat' && e.star) toast('⭐ tidal disruption — a star is devoured');
   else if (e.t === 'grb') toast('☄️ gamma-ray burst');
   else if (e.t === 'nova') toast('💡 nova — a white dwarf erupts');
+  else if (e.t === 'xray' && Math.random() < 0.3) toast('🩻 X-ray binary — a remnant feeds on its companion');
   else if (e.t === 'flare' && Math.random() < 0.3) toast('⚡ magnetar flare');
   else if (e.t === 'giant' && Math.random() < 0.1) toast('🔴 a sun swells into a red giant');
 });

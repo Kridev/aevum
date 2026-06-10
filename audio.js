@@ -228,6 +228,7 @@ SIM.onEvent(e => {
   else if (e.t === 'grb') zap(3400, 180, 0.45, 0.1);
   else if (e.t === 'nova') zap(1500, 700, 0.5, 0.05);
   else if (e.t === 'flare') zap(2400, 900, 0.22, 0.045);
+  else if (e.t === 'xray'){ zap(3000, 2400, 0.06, 0.04); setTimeout(() => zap(3000, 2400, 0.06, 0.04), 90); }
 });
 
 // ---- update loop: drone breathing + pad scheduling + pulsar ticking ----

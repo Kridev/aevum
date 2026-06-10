@@ -178,6 +178,26 @@ const GAS_SPRS = [
   makeSprite('rgba(255,140,190,0.85)', 'rgba(180,50,110,0.4)'),
 ];
 
+// ---- the CMB: a mottled relic glow shown while the universe is still hot ----
+const cmbCv = (() => {
+  const s = 96, c = document.createElement('canvas'); c.width = c.height = s;
+  const g = c.getContext('2d');
+  const img = g.createImageData(s, s);
+  for (let i=0;i<s*s;i++){
+    // smooth-ish anisotropies: sum of a couple of random-phase waves per pixel
+    const x = i % s, y = (i / s)|0;
+    const v = Math.sin(x*0.31+1.7)*Math.sin(y*0.27+0.4) + Math.sin((x+y)*0.19+3.1)
+            + Math.sin(x*0.11-y*0.13+5.2);
+    const t = 0.5 + v*0.16;
+    img.data[i*4]   = 255*Math.min(1, t*1.15);
+    img.data[i*4+1] = 255*Math.min(1, t*0.62);
+    img.data[i*4+2] = 255*Math.min(1, t*0.45);
+    img.data[i*4+3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+  return c;
+})();
+
 // ---- distant starfield (static, parallax) ----
 const FAR = [];
 for (let i=0;i<420;i++) FAR.push({ x:(Math.random()-0.5)*9000, y:(Math.random()-0.5)*9000, s:Math.random() });
@@ -209,6 +229,7 @@ function drainEvents(){
     else if (e.t === 'bhmerge')  fx.push({ k:'gw', x:e.x, y:e.y, age:0, max:80,  m:e.m });
     else if (e.t === 'grb')   fx.push({ k:'grb',  x:e.x, y:e.y, age:0, max:46, m:e.m, a:e.a });
     else if (e.t === 'nova')  fx.push({ k:'nova', x:e.x, y:e.y, age:0, max:34, m:e.m });
+    else if (e.t === 'xray')  fx.push({ k:'flare',x:e.x, y:e.y, age:0, max:18, m:e.m });
     else if (e.t === 'flare') fx.push({ k:'flare',x:e.x, y:e.y, age:0, max:24, m:e.m });
   }
   events.length = 0;
@@ -298,6 +319,15 @@ function draw(){
   ctx.fillRect(0,0,W,H);
   camMoved = false;
 
+  // right after a big bang the whole sky still glows — the CMB, cooling away
+  const cmb = SIM.cmb;
+  if (cmb > 0){
+    ctx.globalAlpha = cmb*cmb * 0.5;
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(cmbCv, 0, 0, W, H);
+    ctx.globalAlpha = 1;
+  }
+
   drawFar();
   if (S.glow) ctx.globalCompositeOperation = 'lighter';
 
@@ -371,6 +401,40 @@ function draw(){
           ctx.globalAlpha = 0.9;
           ctx.fillStyle = ['#9db9ff','#d8b88a','#8fd8c0','#c5cbe8'][k&3];
           ctx.beginPath(); ctx.arc(ppx, ppy, Math.max(1, 0.5*z)*DPR, 0, 6.2832); ctx.fill();
+          ctx.globalAlpha = 1;
+        }
+        // some systems keep an asteroid belt…
+        if (((h>>11)&7) === 0){
+          const ab = (5.5 + np*2.6 + ((h>>13)&3)) * z * DPR;
+          ctx.globalAlpha = 0.55;
+          ctx.fillStyle = '#9aa2bd';
+          for (let k=0;k<26;k++){
+            const a = k*0.2417 + eraNow*0.06 + (h&63);
+            const rr = ab * (1 + 0.06*Math.sin(k*3.7));
+            ctx.fillRect(px + Math.cos(a)*rr, py + Math.sin(a)*rr, DPR, DPR);
+          }
+          ctx.globalAlpha = 1;
+        }
+        // …and some host a comet on a long eccentric ellipse, tail blown sunward-away
+        if (((h>>7)&7) === 0){
+          const ecc = 0.55 + ((h>>9)&3)*0.09;
+          const semi = (10 + ((h>>16)&7)) * z * DPR;
+          const w = (h>>20)&63;
+          const ta = eraNow*0.18 + (h&31);             // sweep angle (not true Kepler — close enough)
+          const cr = semi*(1-ecc*ecc) / (1 + ecc*Math.cos(ta));
+          const cx2 = px + Math.cos(ta+w)*cr, cy2 = py + Math.sin(ta+w)*cr;
+          const near = Math.min(1.6, semi/cr);          // brighter + longer tail near periapsis
+          const tl = 6*z*DPR * near*near;
+          const tg = ctx.createLinearGradient(cx2, cy2,
+            cx2 + Math.cos(ta+w)*tl, cy2 + Math.sin(ta+w)*tl);
+          tg.addColorStop(0, `rgba(190,235,255,${0.7*near})`);
+          tg.addColorStop(1, 'rgba(190,235,255,0)');
+          ctx.strokeStyle = tg; ctx.lineWidth = DPR;
+          ctx.beginPath(); ctx.moveTo(cx2, cy2);
+          ctx.lineTo(cx2 + Math.cos(ta+w)*tl, cy2 + Math.sin(ta+w)*tl); ctx.stroke();
+          ctx.globalAlpha = Math.min(1, 0.5 + 0.5*near);
+          ctx.fillStyle = '#dff2ff';
+          ctx.beginPath(); ctx.arc(cx2, cy2, Math.max(0.8, 0.45*z)*DPR, 0, 6.2832); ctx.fill();
           ctx.globalAlpha = 1;
         }
       }

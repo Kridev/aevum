@@ -40,6 +40,7 @@ const P = {
 };
 let N = 0;          // alive count (alive particles are always 0..N-1)
 let nextId = 1;
+let cmbLeft = 0;    // ticks of cosmic-microwave-background afterglow post big bang
 let era = 0;        // cosmic clock, "Myr"
 
 const events = [];  // {t:'birth'|'sn'|'giant'|'wd'|'eat'|'bhborn', x,y,m} — drained by render
@@ -340,20 +341,22 @@ function mergeCompact(){
   for (let i=N-1;i>=0;i--) if (P.m[i]===0 && (P.type[i]===NS||P.type[i]===MAGNETAR||P.type[i]===BH)) killP(i);
 }
 
-// ---- novae: a white dwarf siphoning a swollen neighbour erupts now and then ----
+// ---- close binaries with a swollen donor: novae and X-ray bursts ----
 const wdIdx = [], giIdx = [];
 function novae(){
   wdIdx.length = 0; giIdx.length = 0;
   for (let i=0;i<N;i++){
-    if (P.type[i]===WD) wdIdx.push(i);
-    else if (P.type[i]===GIANT) giIdx.push(i);
+    const t = P.type[i];
+    if (t===WD || t===NS || t===MAGNETAR) wdIdx.push(i);
+    else if (t===GIANT) giIdx.push(i);
   }
   if (!wdIdx.length || !giIdx.length || wdIdx.length*giIdx.length > 250000) return;
   for (const i of wdIdx){
     for (const j of giIdx){
       const dx=P.x[j]-P.x[i], dy=P.y[j]-P.y[i];
       if (dx*dx+dy*dy < 18*18 && Math.random() < 0.05){
-        events.push({ t:'nova', x:P.x[i], y:P.y[i], m:P.m[i] });
+        // a white dwarf erupts as a nova; a neutron star flares in X-rays
+        events.push({ t: P.type[i]===WD ? 'nova' : 'xray', x:P.x[i], y:P.y[i], m:P.m[i] });
         break;
       }
     }
@@ -387,6 +390,7 @@ function update(){
   const dt = Math.min(2, S.timeScale);
   const sub = S.timeScale > 2 ? 2 : 1;
   for (let k=0;k<sub;k++) step(S.timeScale/sub);
+  if (cmbLeft > 0) cmbLeft -= S.timeScale;
   if (++formTick >= 3){ formTick = 0; formStars(); novae(); }
 }
 
@@ -552,6 +556,7 @@ function spawnCollision(){
 }
 function bigBang(){
   clearAll();
+  cmbLeft = 420;   // the relic glow of the hot young universe, fading as it cools
   // primordial density fluctuations: most matter starts in proto-clumps, the
   // rest is a thin fog. Gravity drags it into filaments — a little cosmic web —
   // and the knots collapse into the first stars.
@@ -577,7 +582,7 @@ function bigBang(){
 // ---- public API ----
 window.SIDEREUM = {
   S, P, events,
-  get N(){ return N; }, get era(){ return era; },
+  get N(){ return N; }, get era(){ return era; }, get cmb(){ return Math.max(0, cmbLeft)/420; },
   GAS, STAR, GIANT, WD, NS, BH, BD, MAGNETAR,
   update, clearAll, addP,
   spawnSpiral, spawnElliptical, spawnNebula, spawnCluster, spawnBinary, spawnCollision,

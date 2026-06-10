@@ -201,15 +201,19 @@ function makeDarkCloud(){   // dark nebula wisp — irregular, occludes the glow
 const DUST_SPRS = [makeDarkCloud(), makeDarkCloud(), makeDarkCloud()];
 // gas wisps: irregular multi-blob clouds (not smooth balls), in nebula tints
 function makeCloud(core, halo){
+  // a connected lumpy mass: many small overlapping blobs pulled toward the
+  // centre — distinct enough to be texture, never a recognisable "stamp"
   const s = 96, c = document.createElement('canvas'); c.width = c.height = s;
   const g = c.getContext('2d');
   g.globalCompositeOperation = 'lighter';
   const gr2 = g.createRadialGradient(s/2, s/2, 0, s/2, s/2, s/2);
   gr2.addColorStop(0, halo); gr2.addColorStop(1, 'rgba(0,0,0,0)');
   g.fillStyle = gr2; g.fillRect(0, 0, s, s);
-  for (let k=0;k<7;k++){
-    const x = s/2 + (Math.random()-0.5)*s*0.5, y = s/2 + (Math.random()-0.5)*s*0.5;
-    const r = s*(0.13 + Math.random()*0.2);
+  for (let k=0;k<12;k++){
+    const pull = Math.pow(Math.random(), 1.6);   // bias blobs toward the core
+    const a = Math.random()*6.2832, d = pull*s*0.3;
+    const x = s/2 + Math.cos(a)*d, y = s/2 + Math.sin(a)*d;
+    const r = s*(0.09 + Math.random()*0.13);
     const gr = g.createRadialGradient(x, y, 0, x, y, r);
     gr.addColorStop(0, core); gr.addColorStop(1, 'rgba(0,0,0,0)');
     g.fillStyle = gr; g.fillRect(0, 0, s, s);
@@ -229,7 +233,9 @@ const GAS_TINTS = [
   ['rgba(190,130,255,0.5)', 'rgba(110,60,200,0.22)'],   // violet
   ['rgba(255,140,190,0.5)', 'rgba(180,50,110,0.22)'],   // magenta
 ];
-const GAS_SPRS = GAS_TINTS.map(([c1, c2]) => makeCloud(c1, c2));
+// four shape variants per tint — combined with per-wisp rotation below, no
+// two neighbouring clouds ever read as the same repeated stamp
+const GAS_SPRS = GAS_TINTS.map(([c1, c2]) => [makeCloud(c1,c2), makeCloud(c1,c2), makeCloud(c1,c2), makeCloud(c1,c2)]);
 // an ionized HII region: gas lit white-pink by the hot young stars inside it
 const emisSpr = makeCloud('rgba(255,205,215,0.6)', 'rgba(255,140,160,0.28)');
 // the bright ionized edge of a sculpted dust pillar
@@ -531,16 +537,22 @@ function draw(){
     const y = P.y[i]; if (y<y0||y>y1) continue;
     const hx = sx(x), hy = sy(y);
     const hue = ((P.hue[i] % 360) + 360) % 360;
-    const spr = GAS_SPRS[(hue/45)|0];
+    const h = (P.id[i]*2654435761)>>>0;
+    const spr = GAS_SPRS[(hue/45)|0][h & 3];
     const gasR = gasR0 * (0.7 + (hue%37)*0.016);   // varied wisp sizes
     const lit = lightG[Math.min(LG_R-1, (hy/H*LG_R)|0)*LG_C + Math.min(LG_C-1, (hx/W*LG_C)|0)];
+    // stable per-wisp rotation (and the odd mirror) — kills stamp repetition
+    const ra = (h>>3)*1.2e-8, rc = Math.cos(ra), rs = Math.sin(ra);
+    const fl = (h&64) ? 1 : -1;
+    gctx.setTransform(rc*fl, rs, -rs*fl, rc, hx*0.5, hy*0.5);
     gctx.globalAlpha = gasA * Math.min(1.9, 0.85 + lit*0.8);
-    gctx.drawImage(spr, hx*0.5-gasR, hy*0.5-gasR, gasR*2, gasR*2);
+    gctx.drawImage(spr, -gasR, -gasR, gasR*2, gasR*2);
     if (lit > 0.35){   // ionization glow takes over near the hot stars
       gctx.globalAlpha = Math.min(0.75, (lit-0.35)*0.7);
-      gctx.drawImage(emisSpr, hx*0.5-gasR, hy*0.5-gasR, gasR*2, gasR*2);
+      gctx.drawImage(emisSpr, -gasR, -gasR, gasR*2, gasR*2);
     }
   }
+  gctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.drawImage(gasCv, 0, 0, W, H);
 
   // dark nebulae: dusty wisps drawn over the glow, carving lanes and globules.
@@ -564,10 +576,11 @@ function draw(){
     const lit = lightG[ci];
     const dgx = lightG[ci+1] - lightG[ci-1], dgy = lightG[ci+LG_C] - lightG[ci-LG_C];
     const glen = Math.hypot(dgx, dgy);
+    const h = (P.id[i]*2654435761)>>>0;
     if (lit > 0.12 && glen > 0.04){
-      const ang = Math.atan2(dgy, dgx);          // toward the light
-      const h = (P.id[i]*2654435761)>>>0;
-      const stretch = 1.35 + Math.min(1.1, glen*0.8) + (h&7)*0.06;
+      // toward the light, with per-wisp sway so fingers never march in step
+      const ang = Math.atan2(dgy, dgx) + (((h>>9)&15) - 7.5) * 0.055;
+      const stretch = 1.3 + Math.min(0.75, glen*0.6) + (h&7)*0.05;
       // against a glowing backdrop, dust reads as a near-black silhouette
       ctx.globalAlpha = Math.min(0.85, 0.55 + lit*0.18);
       ctx.save();
@@ -585,8 +598,12 @@ function draw(){
         rimA[nRim] = ang; rimI[nRim] = Math.min(0.8, lit*0.42); nRim++;
       }
     } else {
+      ctx.save();
+      ctx.translate(hx, hy);
+      ctx.rotate((h>>3)*1.2e-8);
       ctx.globalAlpha = 0.55;
-      ctx.drawImage(spr, hx-dustR, hy-dustR, dustR*2, dustR*2);
+      ctx.drawImage(spr, -dustR, -dustR, dustR*2, dustR*2);
+      ctx.restore();
     }
   }
   // the glowing rims, additive on top of the dark bodies

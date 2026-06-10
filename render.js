@@ -17,6 +17,10 @@ const lctx = lensCv.getContext('2d');
 // coarse screen-space starlight grid — how brightly lit is each patch of sky
 const LG_C = 40, LG_R = 24;
 const lightG = new Float32Array(LG_C * LG_R);
+// scratch buffers for the ionized dust rims (filled per frame, drawn additively)
+const RIM_MAX = 600;
+const rimX = new Float32Array(RIM_MAX), rimY = new Float32Array(RIM_MAX);
+const rimA = new Float32Array(RIM_MAX), rimI = new Float32Array(RIM_MAX);
 let W, H, DPR;
 function resize(){
   DPR = Math.min(2, window.devicePixelRatio || 1);
@@ -228,6 +232,8 @@ const GAS_TINTS = [
 const GAS_SPRS = GAS_TINTS.map(([c1, c2]) => makeCloud(c1, c2));
 // an ionized HII region: gas lit white-pink by the hot young stars inside it
 const emisSpr = makeCloud('rgba(255,205,215,0.6)', 'rgba(255,140,160,0.28)');
+// the bright ionized edge of a sculpted dust pillar
+const rimSpr = makeSprite('rgba(255,225,185,0.85)', 'rgba(255,150,95,0.35)');
 
 // diffraction spikes — the telescope signature of a bright point source.
 // Four main axis-aligned arms plus faint diagonals, pre-rendered once.
@@ -501,11 +507,15 @@ function draw(){
     const y = P.y[i]; if (y<y0||y>y1) continue;
     const gx = (sx(x)/W*LG_C)|0, gy = (sy(y)/H*LG_R)|0;
     const lum = Math.min(2.2, P.m[i]*0.13);
-    for (let oy=-1;oy<=1;oy++){
+    // reach grows with brightness and zoom, so a monster star up close
+    // floods (and sculpts) a whole neighbourhood of cloud
+    const reach = Math.min(5, Math.max(1, Math.round(lum * (0.8 + z*0.8))));
+    for (let oy=-reach;oy<=reach;oy++){
       const yy = gy+oy; if (yy<0||yy>=LG_R) continue;
-      for (let ox=-1;ox<=1;ox++){
+      for (let ox=-reach;ox<=reach;ox++){
         const xx = gx+ox; if (xx<0||xx>=LG_C) continue;
-        lightG[yy*LG_C+xx] += lum * (ox===0&&oy===0 ? 1 : 0.4);
+        const d2 = ox*ox+oy*oy;
+        lightG[yy*LG_C+xx] += lum / (1 + d2*0.7);
       }
     }
   }
@@ -533,18 +543,66 @@ function draw(){
   }
   ctx.drawImage(gasCv, 0, 0, W, H);
 
-  // dark nebulae: dusty wisps drawn over the glow, carving lanes and globules
+  // dark nebulae: dusty wisps drawn over the glow, carving lanes and globules.
+  // Near hot stars the dust is SCULPTED: radiation stretches it into fingers
+  // pointing away from the light, and its star-facing edge ionizes and glows —
+  // the Pillars-of-Creation anatomy. (rims collected here, drawn additively after)
   ctx.globalCompositeOperation = 'source-over';
   ctx.globalAlpha = 0.55;
   const dustR = Math.max(5, 12*zCloud) * DPR;
+  let nRim = 0;
   for (let i=0;i<N;i++){
     if (P.type[i] !== GAS || P.spin[i] === 0) continue;
     const x = P.x[i]; if (x<x0||x>x1) continue;
     const y = P.y[i]; if (y<y0||y>y1) continue;
-    ctx.drawImage(DUST_SPRS[((P.hue[i]*0.043)|0)%3], sx(x)-dustR, sy(y)-dustR, dustR*2, dustR*2);
+    const hx = sx(x), hy = sy(y);
+    const spr = DUST_SPRS[((P.hue[i]*0.043)|0)%3];
+    // where is the light? central difference on the starlight grid
+    const cgx = Math.min(LG_C-2, Math.max(1, (hx/W*LG_C)|0));
+    const cgy = Math.min(LG_R-2, Math.max(1, (hy/H*LG_R)|0));
+    const ci = cgy*LG_C + cgx;
+    const lit = lightG[ci];
+    const dgx = lightG[ci+1] - lightG[ci-1], dgy = lightG[ci+LG_C] - lightG[ci-LG_C];
+    const glen = Math.hypot(dgx, dgy);
+    if (lit > 0.12 && glen > 0.04){
+      const ang = Math.atan2(dgy, dgx);          // toward the light
+      const h = (P.id[i]*2654435761)>>>0;
+      const stretch = 1.35 + Math.min(1.1, glen*0.8) + (h&7)*0.06;
+      // against a glowing backdrop, dust reads as a near-black silhouette
+      ctx.globalAlpha = Math.min(0.85, 0.55 + lit*0.18);
+      ctx.save();
+      ctx.translate(hx, hy);
+      ctx.rotate(ang);
+      ctx.scale(stretch, 0.62);                  // elongated away from / toward the light axis
+      ctx.drawImage(spr, -dustR, -dustR, dustR*2, dustR*2);
+      // a trailing finger on the shadow side
+      const fr = dustR*(0.5 + ((h>>4)&3)*0.1);
+      ctx.drawImage(spr, -dustR*1.5 - fr, -fr + (((h>>7)&7)-3.5)*dustR*0.1, fr*2, fr*2);
+      ctx.restore();
+      if (lit > 0.3 && nRim < RIM_MAX){          // ionized bright rim, light-facing edge
+        rimX[nRim] = hx + Math.cos(ang)*dustR*0.62;
+        rimY[nRim] = hy + Math.sin(ang)*dustR*0.62;
+        rimA[nRim] = ang; rimI[nRim] = Math.min(0.8, lit*0.42); nRim++;
+      }
+    } else {
+      ctx.globalAlpha = 0.55;
+      ctx.drawImage(spr, hx-dustR, hy-dustR, dustR*2, dustR*2);
+    }
+  }
+  // the glowing rims, additive on top of the dark bodies
+  ctx.globalCompositeOperation = 'lighter';
+  const rimR = dustR*0.7;
+  for (let k=0;k<nRim;k++){
+    ctx.save();
+    ctx.translate(rimX[k], rimY[k]);
+    ctx.rotate(rimA[k]);
+    ctx.scale(0.45, 1.25);                       // a thin arc hugging the lit edge
+    ctx.globalAlpha = rimI[k];
+    ctx.drawImage(rimSpr, -rimR, -rimR, rimR*2, rimR*2);
+    ctx.restore();
   }
   ctx.globalAlpha = 1;
-  if (S.glow) ctx.globalCompositeOperation = 'lighter';
+  if (!S.glow) ctx.globalCompositeOperation = 'source-over';
 
   const eraNow = SIM.era;
   // stars are point sources: past 1× they sharpen instead of inflating, and

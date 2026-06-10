@@ -178,23 +178,79 @@ const bdSpr     = makeSprite('rgba(190,110,90,0.9)', 'rgba(120,50,40,0.4)', true
 const wrSpr     = makeSprite('rgba(255,255,255,1)', 'rgba(200,170,255,0.65)');        // Wolf-Rayet fury
 const magSpr    = makeSprite('rgba(235,255,255,1)', 'rgba(120,235,255,0.65)', true);  // magnetar
 const pwnSpr    = makeSprite('rgba(140,200,255,0.5)', 'rgba(70,110,220,0.22)');       // pulsar wind nebula
-const dustSpr   = (() => {   // dark nebula wisp — drawn opaque-ish, occludes the glow
-  const s = 64, c = document.createElement('canvas'); c.width = c.height = s;
+function makeDarkCloud(){   // dark nebula wisp — irregular, occludes the glow
+  const s = 96, c = document.createElement('canvas'); c.width = c.height = s;
   const g = c.getContext('2d');
-  const grad = g.createRadialGradient(s/2, s/2, 0, s/2, s/2, s/2);
-  grad.addColorStop(0, 'rgba(6,5,10,0.85)');
-  grad.addColorStop(0.55, 'rgba(8,6,14,0.4)');
-  grad.addColorStop(1, 'rgba(0,0,0,0)');
-  g.fillStyle = grad; g.fillRect(0, 0, s, s);
+  for (let k=0;k<7;k++){
+    const x = s/2 + (Math.random()-0.5)*s*0.5, y = s/2 + (Math.random()-0.5)*s*0.5;
+    const r = s*(0.14 + Math.random()*0.2);
+    const gr = g.createRadialGradient(x, y, 0, x, y, r);
+    gr.addColorStop(0, 'rgba(6,5,10,0.6)');
+    gr.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, s, s);
+  }
+  return c;
+}
+const DUST_SPRS = [makeDarkCloud(), makeDarkCloud(), makeDarkCloud()];
+// gas wisps: irregular multi-blob clouds (not smooth balls), in nebula tints
+function makeCloud(core, halo){
+  const s = 96, c = document.createElement('canvas'); c.width = c.height = s;
+  const g = c.getContext('2d');
+  g.globalCompositeOperation = 'lighter';
+  const gr2 = g.createRadialGradient(s/2, s/2, 0, s/2, s/2, s/2);
+  gr2.addColorStop(0, halo); gr2.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = gr2; g.fillRect(0, 0, s, s);
+  for (let k=0;k<7;k++){
+    const x = s/2 + (Math.random()-0.5)*s*0.5, y = s/2 + (Math.random()-0.5)*s*0.5;
+    const r = s*(0.13 + Math.random()*0.2);
+    const gr = g.createRadialGradient(x, y, 0, x, y, r);
+    gr.addColorStop(0, core); gr.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, s, s);
+  }
+  return c;
+}
+const GAS_TINTS = [
+  ['rgba(130,170,255,0.5)', 'rgba(60,90,200,0.22)'],
+  ['rgba(190,130,255,0.5)', 'rgba(110,60,200,0.22)'],
+  ['rgba(120,225,235,0.5)', 'rgba(40,130,160,0.22)'],
+  ['rgba(255,140,190,0.5)', 'rgba(180,50,110,0.22)'],
+];
+const GAS_SPRS = [];
+for (const [c1, c2] of GAS_TINTS){ GAS_SPRS.push(makeCloud(c1, c2), makeCloud(c1, c2)); }
+
+// diffraction spikes — the telescope signature of a bright point source.
+// Four main axis-aligned arms plus faint diagonals, pre-rendered once.
+const spikeSpr = (() => {
+  const s = 128, c = document.createElement('canvas'); c.width = c.height = s;
+  const g = c.getContext('2d');
+  g.globalCompositeOperation = 'lighter';
+  const arm = (a, len, w, alpha) => {
+    g.save(); g.translate(s/2, s/2); g.rotate(a);
+    const gr = g.createLinearGradient(-len, 0, len, 0);
+    gr.addColorStop(0, 'rgba(255,255,255,0)');
+    gr.addColorStop(0.5, `rgba(255,255,255,${alpha})`);
+    gr.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = gr; g.fillRect(-len, -w/2, len*2, w);
+    g.restore();
+  };
+  arm(0, 62, 2.6, 0.85); arm(Math.PI/2, 62, 2.6, 0.85);
+  arm(Math.PI/4, 36, 1.8, 0.3); arm(-Math.PI/4, 36, 1.8, 0.3);
   return c;
 })();
-// gas wisps in a few nebula tints, picked per-particle by P.hue
-const GAS_SPRS = [
-  makeSprite('rgba(130,170,255,0.85)', 'rgba(60,90,200,0.4)'),
-  makeSprite('rgba(190,130,255,0.85)', 'rgba(110,60,200,0.4)'),
-  makeSprite('rgba(120,225,235,0.85)', 'rgba(40,130,160,0.4)'),
-  makeSprite('rgba(255,140,190,0.85)', 'rgba(180,50,110,0.4)'),
-];
+
+// a red giant resolved: limb-darkened disc, white-hot centre to deep red rim
+const limbSpr = (() => {
+  const s = 64, c = document.createElement('canvas'); c.width = c.height = s;
+  const g = c.getContext('2d');
+  const gr = g.createRadialGradient(s/2, s/2, 0, s/2, s/2, s/2);
+  gr.addColorStop(0,    'rgba(255,238,205,1)');
+  gr.addColorStop(0.5,  'rgba(255,160,85,0.97)');
+  gr.addColorStop(0.82, 'rgba(205,70,28,0.9)');
+  gr.addColorStop(0.93, 'rgba(120,32,16,0.45)');
+  gr.addColorStop(1,    'rgba(0,0,0,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, s, s);
+  return c;
+})();
 
 // ---- the CMB: a mottled relic glow shown while the universe is still hot ----
 const cmbCv = (() => {
@@ -357,13 +413,17 @@ function draw(){
   // gas first (wisps on the half-res layer), then stars on top at full res
   gctx.clearRect(0, 0, gasCv.width, gasCv.height);
   gctx.globalCompositeOperation = 'lighter';
-  gctx.globalAlpha = Math.min(0.5, 0.3 + 0.07/z);
-  const gasR = Math.max(4, 10*z) * DPR;   // half-res radius — wisps must overlap into nebulae
+  // clouds grow sublinearly with zoom, so zooming in resolves nebulae into
+  // wisps and filaments instead of inflating them into airbrushed balls
+  const zCloud = z <= 1 ? z : Math.pow(z, 0.6);
+  gctx.globalAlpha = Math.min(0.55, 0.34 + 0.07/z);
+  const gasR0 = Math.max(4, 10*zCloud) * DPR;   // half-res radius
   for (let i=0;i<N;i++){
     if (P.type[i] !== GAS || P.spin[i] > 0) continue;
     const x = P.x[i]; if (x<x0||x>x1) continue;
     const y = P.y[i]; if (y<y0||y>y1) continue;
-    const spr = GAS_SPRS[((P.hue[i]*0.0111)|0) & 3];
+    const spr = GAS_SPRS[((P.hue[i]*0.0111)|0) & 7];
+    const gasR = gasR0 * (0.7 + (P.hue[i]%37)*0.016);   // varied wisp sizes
     gctx.drawImage(spr, sx(x)*0.5-gasR, sy(y)*0.5-gasR, gasR*2, gasR*2);
   }
   ctx.drawImage(gasCv, 0, 0, W, H);
@@ -371,17 +431,20 @@ function draw(){
   // dark nebulae: dusty wisps drawn over the glow, carving lanes and globules
   ctx.globalCompositeOperation = 'source-over';
   ctx.globalAlpha = 0.55;
-  const dustR = Math.max(5, 12*z) * DPR;
+  const dustR = Math.max(5, 12*zCloud) * DPR;
   for (let i=0;i<N;i++){
     if (P.type[i] !== GAS || P.spin[i] === 0) continue;
     const x = P.x[i]; if (x<x0||x>x1) continue;
     const y = P.y[i]; if (y<y0||y>y1) continue;
-    ctx.drawImage(dustSpr, sx(x)-dustR, sy(y)-dustR, dustR*2, dustR*2);
+    ctx.drawImage(DUST_SPRS[((P.hue[i]*0.043)|0)%3], sx(x)-dustR, sy(y)-dustR, dustR*2, dustR*2);
   }
   ctx.globalAlpha = 1;
   if (S.glow) ctx.globalCompositeOperation = 'lighter';
 
   const eraNow = SIM.era;
+  // stars are point sources: past 1× they sharpen instead of inflating, and
+  // the bright ones grow telescope diffraction spikes
+  const zStar = z <= 1 ? z : Math.pow(z, 0.42);
   let systemsDrawn = 0;
   for (let i=0;i<N;i++){
     const t = P.type[i];
@@ -391,7 +454,7 @@ function draw(){
     const px = sx(x), py = sy(y);
     const m = P.m[i];
     if (t === STAR){
-      let r = Math.max(2.2, (2 + Math.pow(m,0.45)*2.6) * z) * DPR;
+      let r = Math.max(2.2, (2 + Math.pow(m,0.45)*2.6) * zStar) * DPR;
       // Cepheid variables breathe — brightness swells and dims on a steady beat
       if (P.spin[i] > 0) r *= 1 + 0.3*Math.sin(eraNow*P.spin[i]*0.8 + P.hue[i]);
       const wr = m > 24;   // Wolf-Rayet: furious wind, violet sheath
@@ -403,22 +466,35 @@ function draw(){
         ctx.drawImage(spr, px-r2, py-r2, r2*2, r2*2);
         ctx.globalAlpha = 1;
       }
-      // zoom close enough and a star resolves into a little planetary system
+      if (z > 1.1 && m > 0.55){
+        const sl = r * (2.6 + Math.min(3, m*0.12)) * Math.min(1, (z-1.1)*0.8);
+        ctx.globalAlpha = Math.min(0.85, 0.3 + m*0.05);
+        ctx.drawImage(spikeSpr, px-sl, py-sl, sl*2, sl*2);
+        ctx.globalAlpha = 1;
+      }
+      // zoom close enough and a star resolves into a little planetary system —
+      // planets are barely-there motes in muted mineral tones, the way they'd
+      // really look next to their sun; orbits only whisper unless followed
       if (z > 2.2 && systemsDrawn < 150){
         systemsDrawn++;
         const h = (P.id[i]*2654435761)>>>0;
         const np = h % 5;
+        const followed = followId && followIdx === i;
         for (let k=0;k<np;k++){
-          const orbR = (4 + k*2.6 + ((h>>(k*3))&3)) * z * DPR;
-          const sp = 0.5/Math.pow(4+k*2.6, 0.8);
+          const orbR = (3 + k*1.9 + ((h>>(k*3))&3)*0.7) * z * DPR;
+          const sp = 0.5/Math.pow(3+k*1.9, 0.8);
           const a = eraNow*sp + ((h>>(k*5))&31);
           const ppx = px + Math.cos(a)*orbR, ppy = py + Math.sin(a)*orbR;
-          ctx.globalAlpha = 0.25;
-          ctx.strokeStyle = '#8893b8'; ctx.lineWidth = 0.5*DPR;
-          ctx.beginPath(); ctx.arc(px, py, orbR, 0, 6.2832); ctx.stroke();
-          ctx.globalAlpha = 0.9;
-          ctx.fillStyle = ['#9db9ff','#d8b88a','#8fd8c0','#c5cbe8'][k&3];
-          ctx.beginPath(); ctx.arc(ppx, ppy, Math.max(1, 0.5*z)*DPR, 0, 6.2832); ctx.fill();
+          if (followed || z > 3.2){
+            ctx.globalAlpha = followed ? 0.28 : 0.07;
+            ctx.strokeStyle = '#8893b8'; ctx.lineWidth = 0.5*DPR;
+            ctx.beginPath(); ctx.arc(px, py, orbR, 0, 6.2832); ctx.stroke();
+          }
+          const giantP = ((h>>(k*2+9))&7) === 0;   // the occasional gas giant
+          ctx.globalAlpha = 0.85;
+          ctx.fillStyle = ['#8a8f98','#b08d6a','#6f8fb0','#c2a577'][(h>>(k*4))&3];
+          ctx.beginPath();
+          ctx.arc(ppx, ppy, Math.max(0.7, (giantP?0.5:0.28)*z)*DPR, 0, 6.2832); ctx.fill();
           ctx.globalAlpha = 1;
         }
         // some systems keep an asteroid belt…
@@ -458,24 +534,34 @@ function draw(){
       }
     } else if (t === BD){
       // a failed star: barely an ember
-      const r = Math.max(1.2, 1.6*z) * DPR;
+      const r = Math.max(1.2, 1.6*zStar) * DPR;
       ctx.globalAlpha = 0.8;
       ctx.drawImage(bdSpr, px-r, py-r, r*2, r*2);
       ctx.globalAlpha = 1;
     } else if (t === GIANT){
-      const r = Math.max(1.6, (3 + Math.pow(m,0.45)*3.6) * z) * DPR;
-      // giants smoulder — slow breathing pulse
+      // giants ARE physically huge — they keep growing with zoom and, close
+      // up, resolve into a limb-darkened disc with a convective shimmer
+      const r = Math.max(1.6, (3 + Math.pow(m,0.45)*3.6) * (z<=1?z:Math.pow(z,0.8))) * DPR;
       const b = 1 + 0.12*Math.sin(performance.now()*0.004 + i);
       ctx.drawImage(giantSpr, px-r*b, py-r*b, r*2*b, r*2*b);
+      if (z > 1.4){
+        const dr = r*0.62*b;
+        ctx.drawImage(limbSpr, px-dr, py-dr, dr*2, dr*2);
+      }
     } else if (t === WD){
       const fade = Math.max(0.25, 1 - P.age[i]/30000);
-      const r = Math.max(0.9, 1.7*z) * DPR;
+      const r = Math.max(0.9, 1.5*zStar) * DPR;
       ctx.globalAlpha = fade;
       ctx.drawImage(wdSpr, px-r, py-r, r*2, r*2);
+      if (z > 1.1){   // tiny but intense: a pinprick with spikes
+        const sl = r*2.4;
+        ctx.globalAlpha = fade*0.5;
+        ctx.drawImage(spikeSpr, px-sl, py-sl, sl*2, sl*2);
+      }
       ctx.globalAlpha = 1;
     } else if (t === NS || t === MAGNETAR){
       const mag = t === MAGNETAR;
-      const r = Math.max(1, (mag?3:2)*z) * DPR;
+      const r = Math.max(1, (mag?3:2)*zStar) * DPR;
       // young remnants still wear their pulsar wind nebula
       if (P.age[i] < 2600){
         const nr = 14*z*DPR * (0.6 + 0.4*(1 - P.age[i]/2600));
@@ -484,16 +570,23 @@ function draw(){
         ctx.globalAlpha = 1;
       }
       ctx.drawImage(mag ? magSpr : nsSpr, px-r, py-r, r*2, r*2);
-      // the lighthouse: two opposed beams sweeping with the spin phase
+      // the lighthouse: two opposed radiation CONES sweeping with the spin —
+      // narrow at the pole, flaring and fading with distance
       const a = P.hue[i], L = ((mag?40:26) + 10*Math.sin(a*3)) * z * DPR;
-      ctx.globalAlpha = mag ? 0.65 : 0.5;
-      ctx.strokeStyle = mag ? '#aef2ff' : '#cfe8ff';
-      ctx.lineWidth = Math.max(0.6, (mag?1.4:0.9)*z*DPR);
-      ctx.beginPath();
-      ctx.moveTo(px - Math.cos(a)*L, py - Math.sin(a)*L);
-      ctx.lineTo(px + Math.cos(a)*L, py + Math.sin(a)*L);
-      ctx.stroke();
-      ctx.globalAlpha = 1;
+      const wEnd = L * (mag ? 0.16 : 0.1);
+      const col = mag ? '174,242,255' : '207,232,255';
+      for (let side=0; side<2; side++){
+        const dx = Math.cos(a + side*Math.PI), dy = Math.sin(a + side*Math.PI);
+        const bg = ctx.createLinearGradient(px, py, px+dx*L, py+dy*L);
+        bg.addColorStop(0, `rgba(${col},${mag?0.7:0.55})`);
+        bg.addColorStop(1, `rgba(${col},0)`);
+        ctx.fillStyle = bg;
+        ctx.beginPath();
+        ctx.moveTo(px, py);
+        ctx.lineTo(px+dx*L - dy*wEnd, py+dy*L + dx*wEnd);
+        ctx.lineTo(px+dx*L + dy*wEnd, py+dy*L - dx*wEnd);
+        ctx.closePath(); ctx.fill();
+      }
     } else if (t === BH){
       const core = Math.max(1.2, (2 + Math.sqrt(m)*0.16) * z) * DPR;
       const feed = Math.min(1, P.hue[i] / 60);
@@ -533,6 +626,22 @@ function draw(){
         lctx.restore();
         ctx.globalAlpha = 0.75;
         ctx.drawImage(lensCv, 0, 0, d*2, d*2, px-d, py-d, d*2, d*2);
+        ctx.globalAlpha = 1;
+      }
+      // feeding holes resolved up close get the M87 look: a tilted accretion
+      // disc, doppler-beamed — the side spinning toward you burns brighter
+      if (z > 1.3 && feed > 0.15){
+        const dr = core*2.1;
+        ctx.save();
+        ctx.translate(px, py); ctx.rotate(0.5); ctx.scale(1, 0.38);
+        ctx.lineWidth = core*0.55;
+        ctx.globalAlpha = Math.min(0.9, 0.45 + 0.5*feed);
+        ctx.strokeStyle = '#fff6dd';                       // approaching side
+        ctx.beginPath(); ctx.arc(0, 0, dr, Math.PI*0.55, Math.PI*1.45); ctx.stroke();
+        ctx.globalAlpha = Math.min(0.5, 0.18 + 0.25*feed);
+        ctx.strokeStyle = '#ff9a4d';                       // receding side
+        ctx.beginPath(); ctx.arc(0, 0, dr, Math.PI*1.45, Math.PI*0.55); ctx.stroke();
+        ctx.restore();
         ctx.globalAlpha = 1;
       }
       // the hole itself: a disc of true black with a thin photon ring
